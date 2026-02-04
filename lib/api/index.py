@@ -9,6 +9,36 @@ from datetime import datetime
 import os
 import sys
 
+# AJOUTE CE CODE AU DÉBUT de api/index.py
+def handler(request):
+    # Extraire le path de la requête
+    path = request.path if hasattr(request, 'path') else '/'
+    
+    # Si c'est la racine ou /api/, traiter normalement
+    if path == '/' or path.startswith('/api/'):
+        return main_handler(request)
+    else:
+        # Pour les autres routes, retourner 404
+        return {
+            'statusCode': 404,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'error': 'Not found'})
+        }
+
+def main_handler(request):
+    # LE RESTE DE TON CODE ACTUEL ICI...
+    # (tout ce que tu as déjà dans ta fonction handler)
+    
+    # Headers CORS
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Content-Type': 'application/json; charset=utf-8'
+    }
+    
+    # ... reste du code inchangé ...
+    
 # === FONCTIONS AUXILIAIRES ===
 
 def parse_multipart_form_data(body, boundary):
