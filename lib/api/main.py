@@ -4,6 +4,25 @@ import sys
 import json
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+from fastapi.middleware.cors import CORSMiddleware
+
+# Créer l'application
+app = FastAPI(title="TruthTalent API", version="1.0.0")
+
+# Configuration CORS COMPLÈTE
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://truthtalent.online",  # Votre site WordPress
+        "http://localhost:3000",        # Dev local
+        "http://127.0.0.1:3000",        # Dev local
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],  # GET, POST, etc.
+    allow_headers=["*"],  # Tous les headers
+    expose_headers=["*"],  # Exposer tous les headers
+    max_age=3600,  # Cache CORS pour 1 heure
+)
 
 # Ajouter le chemin parent pour les imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -333,3 +352,80 @@ if app:
     if __name__ == "__main__":
         import uvicorn
         uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+
+    @app.post("/jobs")
+    async def process_cv(
+    file: UploadFile = File(...),
+    email: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
+    user_name: Optional[str] = Form(None),
+    offer_id: Optional[str] = Form(None),
+    message: Optional[str] = Form(None),
+    source: str = Form("web")
+):
+        """Endpoint principal pour traiter les CVs"""
+        try:
+            print("=" * 50)
+            print("📥 NOUVELLE REQUÊTE REÇUE")
+            print(f"Headers: {dict(request.headers) if hasattr(request, 'headers') else 'No headers'}")
+            print(f"File: {file.filename} ({file.size if hasattr(file, 'size') else 'unknown'} bytes)")
+            print(f"Email: {email}")
+            print(f"User ID: {user_id}")
+            print("=" * 50)
+            
+            # Lire le fichier
+            contents = await file.read()
+            print(f"✅ Fichier lu: {len(contents)} bytes")
+            
+            # Validation
+            if not file.filename:
+                raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+                
+            if len(contents) == 0:
+                raise HTTPException(status_code=400, detail="Fichier vide")
+            
+            # Calcul du hash
+            import hashlib
+            file_hash = hashlib.md5(contents).hexdigest()
+            print(f"📊 Hash calculé: {file_hash}")
+            
+            # Parser le CV (version simplifiée pour test)
+            cv_data = {
+                "nom": "Test",
+                "prenom": "User",
+                "email": email or "test@example.com",
+                "telephone": "",
+                "competences": ["Python", "JavaScript"],
+                "niveau": "Junior",
+                "annees_experience": 1.0,
+                "raw_text": "CV de test",
+                "confidence_score": 0.5,
+                "parse_status": "test"
+            }
+            
+            print(f"📝 Données CV préparées: {cv_data}")
+            
+            # Réponse de test
+            response_data = {
+                "success": True,
+                "message": "CV reçu avec succès (mode test)",
+                "file_hash": file_hash,
+                "filename": file.filename,
+                "cv_data": cv_data,
+                "test_mode": True
+            }
+            
+            print(f"✅ Réponse envoyée: {response_data}")
+            return JSONResponse(content=response_data, status_code=200)
+                
+        except HTTPException as he:
+            print(f"❌ HTTPException: {he.detail}")
+            raise he
+        except Exception as e:
+            print(f"💥 Erreur inattendue: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Erreur interne: {str(e)[:100]}"
+            )
