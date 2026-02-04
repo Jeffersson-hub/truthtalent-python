@@ -1,4 +1,4 @@
-# lib/supabase_handler.py
+# Modifiez le début du fichier supabase_handler.py
 import os
 import hashlib
 import json
@@ -7,21 +7,39 @@ from typing import Dict, Optional
 
 # Import conditionnel pour Vercel
 try:
-    from supabase import create_client, Client # type: ignore
+    from supabase import create_client, Client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
     print("Warning: supabase not installed")
 
+# Ajoutez ceci pour les logs de debug
+import sys
+print(f"Python path in supabase_handler: {sys.path}", file=sys.stderr)
+print(f"Current directory: {os.getcwd()}", file=sys.stderr)
+
 class SupabaseHandler:
     def __init__(self):
+        # Debug: afficher les variables d'environnement disponibles
+        env_vars = {k: 'SET' for k in os.environ if 'SUPABASE' in k}
+        print(f"Supabase env vars available: {list(env_vars.keys())}", file=sys.stderr)
+        
         self.supabase_url = os.getenv('SUPABASE_URL', '')
         self.supabase_key = os.getenv('SUPABASE_SERVICE_KEY', '')
         
-        if not self.supabase_url or not self.supabase_key:
-            raise ValueError("Variables Supabase manquantes")
+        if not self.supabase_url:
+            print("ERROR: SUPABASE_URL not set", file=sys.stderr)
+        if not self.supabase_key:
+            print("ERROR: SUPABASE_SERVICE_KEY not set", file=sys.stderr)
         
-        self.client = create_client(self.supabase_url, self.supabase_key)
+        # Continue même si vide pour permettre le démarrage
+        if self.supabase_url and self.supabase_key:
+            self.client = create_client(self.supabase_url, self.supabase_key)
+            print("✅ Supabase client created successfully", file=sys.stderr)
+        else:
+            self.client = None
+            print("⚠️ Supabase client not created - missing credentials", file=sys.stderr)
+
     
     def calculate_file_hash(self, file_content: bytes) -> str:
         """Calcule le hash MD5"""
