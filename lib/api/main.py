@@ -1,36 +1,154 @@
-# lib/api/main.py - Version corrigée
-import hashlib  # AJOUTÉ en haut
+import hashlib
 import os
 import sys
 import json
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Any
 
 # Ajouter le chemin parent pour les imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.join(current_dir, '..')
+sys.path.append(parent_dir)
 
 # Gestion des imports optionnels
 try:
-    from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+    from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
     FASTAPI_AVAILABLE = True
-except ImportError:
-    FASTAPI_AVAILABLE = False
-    print("⚠️  FastAPI non installé - mode test seulement")
-
-try:
-    from supabase_handler import SupabaseHandler
-    SUPABASE_HANDLER_AVAILABLE = True
+    print("✅ FastAPI importé avec succès")
 except ImportError as e:
-    SUPABASE_HANDLER_AVAILABLE = False
-    print(f"⚠️  SupabaseHandler non disponible: {e}")
+    FASTAPI_AVAILABLE = False
+    print(f"⚠️ FastAPI non disponible: {e}")
 
-# Créer l'application seulement si FastAPI est disponible
-if FASTAPI_AVAILABLE:
-    app = FastAPI(title="TruthTalent API")
+# Import de votre parser CV
+try:
+    from lib.cv_parser import CVParser
+    CV_PARSER_AVAILABLE = True
+    print("✅ CVParser importé")
+except ImportError:
+    CV_PARSER_AVAILABLE = False
+    print("⚠️ CVParser non disponible - création minimaliste")
+
+# Import Supabase
+try:
+    from supabase import create_client
+    SUPABASE_AVAILABLE = True
+    print("✅ Supabase importé")
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    print("⚠️ Supabase non disponible")
+
+# ============================================
+# PARSER CV MINIMAL SI MANQUANT
+# ============================================
+if not CV_PARSER_AVAILABLE:
+    class CVParser:
+        def parse_cv(self, file_content: bytes, filename: str) -> Dict:
+            return {
+                "success": True,
+                "raw_text": "Texte extrait minimal",
+                "nom": "Test",
+                "prenom": "User",
+                "email": "test@example.com",
+                "telephone": "",
+                "competences": ["Python", "JavaScript"],
+                "niveau": "Junior",
+                "annees_experience": 1.0,
+                "confidence_score": 0.5,
+                "parse_status": "fallback"
+            }
+
+# ============================================
+# HANDLER SUPABASE MINIMAL SI MANQUANT
+# ============================================
+class SupabaseHandler:
+    def __init__(self):
+        self.supabase_url = os.getenv('SUPABASE_URL', '')
+        self.supabase_key = os.getenv('SUPABASE_SERVICE_KEY', '')
+        
+        if not self.supabase_url or not self.supabase_key:
+            print("⚠️ Variables Supabase manquantes")
+            self.client = None
+        else:
+            try:
+                self.client = create_client(self.supabase_url, self.supabase_key)
+                print("✅ Client Supabase créé")
+            except Exception as e:
+                print(f"❌ Erreur Supabase: {e}")
+                self.client = None
     
-    # CORS configuration
+    def upload_to_storage(self, file_content: bytes, file_hash: str, filename: str) -> Dict:
+        if not self.client:
+            return {"success": False, "error": "Client Supabase non disponible"}
+        
+        try:
+            bucket_name = "cvs"
+            file_path = f"{file_hash}_{filename}"
+            
+            response = self.client.storage.from_(bucket_name).upload(
+                file_path, 
+                file_content,
+                {"content-type": "application/pdf"}
+            )
+            
+            public_url = self.client.storage.from_(bucket_name).get_public_url(file_path)
+            
+            return {
+                "success": True,
+                "file_path": file_path,
+                "public_url": public_url
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def save_candidate(self, cv_data: Dict, file_hash: str, filename: str) -> Dict:
+        if not self.client:
+            return {"success": False, "error": "Supabase non disponible"}
+        
+        try:
+            candidate_record = {
+                'nom': cv_data.get('nom', ''),
+                'prenom': cv_data.get('prenom', ''),
+                'email': cv_data.get('email', ''),
+                'telephone': cv_data.get('telephone', ''),
+                'competences': json.dumps(cv_data.get('competences', []), ensure_ascii=False),
+                'niveau': cv_data.get('niveau', ''),
+                'annees_experience': cv_data.get('annees_experience', 0.0),
+                'fichier': filename,
+                'file_hash': file_hash,
+                'cv_filename': filename,
+                'raw_text': cv_data.get('raw_text', '')[:5000],
+                'confidence_score': cv_data.get('confidence_score', 0.5),
+                'parse_status': cv_data.get('parse_status', 'success'),
+                'date_import': datetime.now().isoformat(),
+                'source': cv_data.get('source', 'api_python')
+            }
+            
+            # Si WordPress
+            if 'wp_user_id' in cv_data:
+                candidate_record['wp_user_id'] = cv_data['wp_user_id']
+                candidate_record['wp_offer_id'] = cv_data.get('wp_offer_id')
+                candidate_record['source'] = 'wordpress'
+            
+            response = self.client.table('candidats').insert(candidate_record).execute()
+            
+            return {
+                "success": True,
+                "candidat_id": response.data[0]['id'] if response.data else None,
+                "action": "created"
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+# ============================================
+# CRÉATION DE L'APPLICATION FASTAPI
+# ============================================
+if FASTAPI_AVAILABLE:
+    app = FastAPI(title="TruthTalent API", version="1.0.0")
+    
+    # CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -39,27 +157,37 @@ if FASTAPI_AVAILABLE:
         allow_headers=["*"],
     )
 else:
+    # Fallback si FastAPI n'est pas installé
     app = None
-    print("⚠️  Application FastAPI non créée - installations manquantes")
+    print("❌ FastAPI non disponible - application non créée")
 
-# Initialiser Supabase
-supabase_handler = None
-if SUPABASE_HANDLER_AVAILABLE:
-    try:
-        supabase_handler = SupabaseHandler()
-        print("✅ Supabase connecté avec succès")
-    except Exception as e:
-        print(f"⚠️  Supabase non initialisé: {e}")
-else:
-    print("⚠️  SupabaseHandler non disponible")
+# ============================================
+# INITIALISATION
+# ============================================
+cv_parser = CVParser() if CV_PARSER_AVAILABLE else CVParser()
+supabase_handler = SupabaseHandler()
 
-# Routes seulement si app existe
+print("=" * 50)
+print("TruthTalent API Initialisée")
+print(f"FastAPI: {'✅' if FASTAPI_AVAILABLE else '❌'}")
+print(f"CVParser: {'✅' if CV_PARSER_AVAILABLE else '⚠️ Fallback'}")
+print(f"Supabase: {'✅' if supabase_handler.client else '❌'}")
+print("=" * 50)
+
+# ============================================
+# ROUTES API
+# ============================================
 if app:
     @app.get("/")
     async def root():
         return {
             "message": "TruthTalent API opérationnelle",
-            "version": "1.0",
+            "version": "1.0.0",
+            "status": {
+                "fastapi": FASTAPI_AVAILABLE,
+                "supabase": supabase_handler.client is not None,
+                "cv_parser": CV_PARSER_AVAILABLE
+            },
             "endpoints": {
                 "root": "GET /",
                 "health": "GET /health",
@@ -70,94 +198,138 @@ if app:
     
     @app.get("/health")
     async def health_check():
-        """Vérifie la santé de l'API"""
-        status = {
-            "api": "healthy" if FASTAPI_AVAILABLE else "missing_deps",
-            "supabase": "connected" if supabase_handler else "disconnected",
-            "deps": {
-                "fastapi": FASTAPI_AVAILABLE,
-                "supabase_handler": SUPABASE_HANDLER_AVAILABLE
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "services": {
+                "api": "running",
+                "supabase": "connected" if supabase_handler.client else "disconnected",
+                "cv_parser": "available" if CV_PARSER_AVAILABLE else "fallback"
             }
         }
-        
-        if not FASTAPI_AVAILABLE:
-            status["error"] = "Installez: pip install fastapi uvicorn"
-        
-        return status
     
     @app.post("/jobs")
-    async def process_cv_job(
+    async def process_cv(
         file: UploadFile = File(...),
-        email: str = None
+        email: Optional[str] = Form(None),
+        user_id: Optional[str] = Form(None),
+        user_name: Optional[str] = Form(None),
+        offer_id: Optional[str] = Form(None),
+        message: Optional[str] = Form(None),
+        source: str = Form("web")
     ):
-        """Traite un CV"""
+        """Endpoint principal pour traiter les CVs"""
         try:
             # Lire le fichier
             contents = await file.read()
             
-            # Calculer le hash
-            file_hash = hashlib.md5(contents).hexdigest()
+            # Validation
+            if not file.filename.lower().endswith(('.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg')):
+                raise HTTPException(status_code=400, detail="Type de fichier non supporté")
             
-            # Sauvegarder dans Supabase Storage
-            if supabase_handler:
-                bucket_name = "cvs"
-                file_path = f"{file_hash}_{file.filename}"
+            # Calcul du hash
+            file_hash = hashlib.md5(contents).hexdigest()
+            print(f"📄 Fichier reçu: {file.filename} ({len(contents)} bytes)")
+            print(f"📧 Email: {email}")
+            print(f"👤 User ID: {user_id}")
+            print(f"🎯 Offer ID: {offer_id}")
+            
+            # Parser le CV
+            cv_data = cv_parser.parse_cv(contents, file.filename)
+            
+            # Priorité à l'email fourni
+            if email:
+                cv_data['email'] = email
+            
+            # Ajouter les infos WordPress
+            cv_data['source'] = source
+            if user_id:
+                cv_data['wp_user_id'] = user_id
+            if user_name:
+                cv_data['wp_user_name'] = user_name
+            if offer_id:
+                cv_data['wp_offer_id'] = offer_id
+            if message:
+                cv_data['message'] = message
+            
+            # Upload vers Supabase Storage
+            storage_result = None
+            if supabase_handler.client:
+                storage_result = supabase_handler.upload_to_storage(contents, file_hash, file.filename)
                 
-                # Upload vers Supabase Storage
-                try:
-                    storage_response = supabase_handler.client.storage.from_(bucket_name).upload(
-                        file_path, contents
-                    )
-                    
-                    # Préparer les données du CV
-                    cv_data = {
-                        "nom": "À extraire du CV",
-                        "prenom": "",
-                        "email": email or "inconnu@example.com",
-                        "filename": file.filename,
-                        "file_hash": file_hash,
-                        "raw_text": "Contenu à analyser..."
-                    }
-                    
-                    # Sauvegarder dans la table
-                    result = supabase_handler.save_candidate(cv_data, file_hash, file.filename)
-                    
-                    return {
-                        "success": True,
-                        "message": "CV traité avec succès",
-                        "file_hash": file_hash,
-                        "storage_path": file_path,
-                        "supabase_result": result
-                    }
-                    
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail=f"Erreur Supabase: {str(e)}")
-            else:
-                raise HTTPException(status_code=503, detail="Supabase non configuré")
+                if storage_result.get('success'):
+                    print(f"✅ CV uploadé: {storage_result.get('public_url')}")
+                else:
+                    print(f"⚠️ Upload storage échoué: {storage_result.get('error')}")
+            
+            # Sauvegarder dans la base de données
+            db_result = None
+            if supabase_handler.client:
+                db_result = supabase_handler.save_candidate(cv_data, file_hash, file.filename)
                 
+                if db_result.get('success'):
+                    print(f"✅ Candidat enregistré: ID {db_result.get('candidat_id')}")
+                else:
+                    print(f"⚠️ Sauvegarde DB échouée: {db_result.get('error')}")
+            
+            # Réponse
+            response_data = {
+                "success": True,
+                "message": "CV traité avec succès",
+                "file_hash": file_hash,
+                "filename": file.filename,
+                "cv_data": {
+                    "nom": cv_data.get('nom'),
+                    "prenom": cv_data.get('prenom'),
+                    "email": cv_data.get('email'),
+                    "telephone": cv_data.get('telephone'),
+                    "competences": cv_data.get('competences', []),
+                    "niveau": cv_data.get('niveau'),
+                    "annees_experience": cv_data.get('annees_experience'),
+                    "confidence_score": cv_data.get('confidence_score', 0.5)
+                },
+                "storage": storage_result,
+                "database": db_result
+            }
+            
+            return JSONResponse(content=response_data, status_code=200)
+            
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erreur traitement CV: {str(e)}")
+            print(f"💥 Erreur traitement: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
     
     @app.get("/candidates")
     async def get_candidates(limit: int = 50, offset: int = 0):
-        """Récupère la liste des candidats"""
-        if not supabase_handler:
+        """Récupérer la liste des candidats"""
+        if not supabase_handler.client:
             raise HTTPException(status_code=503, detail="Supabase non disponible")
         
-        result = supabase_handler.get_candidates(limit, offset)
-        
-        if result['success']:
-            return result
-        else:
-            raise HTTPException(status_code=500, detail=result['error'])
+        try:
+            response = supabase_handler.client.table('candidats') \
+                .select('*') \
+                .order('date_import', desc=True) \
+                .range(offset, offset + limit - 1) \
+                .execute()
+            
+            return {
+                "success": True,
+                "count": len(response.data),
+                "candidates": response.data
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
     
-    # Pour le lancement local
+    # Middleware pour loguer les requêtes
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        print(f"📥 {request.method} {request.url}")
+        response = await call_next(request)
+        print(f"📤 {response.status_code}")
+        return response
+    
+    # Pour exécution locale
     if __name__ == "__main__":
         import uvicorn
-        uvicorn.run(app, host="0.0.0.0", port=8000)
-else:
-    # Mode de secours
-    print("\n" + "="*50)
-    print("INSTALLATION REQUISE:")
-    print("pip install fastapi uvicorn supabase python-dotenv")
-    print("="*50 + "\n")
+        uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Upload CV - TruthTalent</title>
+</head>
+<body>
+    <h1>Upload de CV pour analyse</h1>
+    
+    <form id="uploadForm">
+        <div>
+            <label>Email (optionnel):</label>
+            <input type="email" id="email" name="email">
+        </div>
+        
+        <div>
+            <label>Sélectionner CV (PDF):</label>
+            <input type="file" id="cvFile" accept=".pdf" required>
+        </div>
+        
+        <button type="submit">Analyser le CV</button>
+    </form>
+    
+    <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+    
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('cvFile');
+            const emailInput = document.getElementById('email');
+            
+            formData.append('file', fileInput.files[0]);
+            if (emailInput.value) {
+                formData.append('email', emailInput.value);
+            }
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Analyse en cours...</p>';
+            
+            try {
+                const response = await fetch('/jobs', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <h3>✅ CV analysé avec succès !</h3>
+                        <p><strong>Nom:</strong> ${data.cv_data.prenom} ${data.cv_data.nom}</p>
+                        <p><strong>Email:</strong> ${data.cv_data.email || 'Non trouvé'}</p>
+                        <p><strong>Niveau:</strong> ${data.cv_data.niveau}</p>
+                        <p><strong>Années d'expérience:</strong> ${data.cv_data.annees_experience}</p>
+                        <p><strong>Compétences:</strong> ${data.cv_data.competences.join(', ')}</p>
+                        <p><strong>Hash du fichier:</strong> ${data.file_hash}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p style="color: red;">❌ Erreur: ${data.error || 'Inconnue'}</p>`;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">❌ Erreur réseau: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
