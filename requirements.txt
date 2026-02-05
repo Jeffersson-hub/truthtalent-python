@@ -1,4 +1,4 @@
-# requirements.txt - VERSION COMPATIBLE VERCEL
+# requirements.txt
 
 # Core FastAPI & Vercel
 fastapi==0.104.1
