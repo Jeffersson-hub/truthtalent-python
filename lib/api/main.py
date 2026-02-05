@@ -2,9 +2,14 @@ import hashlib
 import os
 import sys
 import json
+from urllib import request
+import uvicorn
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request, HTTPException, UploadFile, Form
+from fastapi import Request
+
 
 # Créer l'application
 app = FastAPI(title="TruthTalent API", version="1.0.0")
@@ -429,3 +434,31 @@ if app:
                 status_code=500, 
                 detail=f"Erreur interne: {str(e)[:100]}"
             )
+        @app.post("/upload/")
+        async def upload_file(
+            request: Request,
+            file: UploadFile,
+            email: str = Form(...),
+            user_id: str = Form(...)
+        ):
+            print("=" * 50)
+            print(" NOUVELLE REQUÊTE REÇUE")
+            print(f"Headers: {dict(request.headers)}")
+            print(f"File: {file.filename} ({file.size})")
+            print(f"Email: {email}")
+            print(f"User ID: {user_id}")
+            print("=" * 50)
+
+            # Lire le fichier
+            if file:
+                contents = await file.read()
+                print(f"✓ Fichier lu: {len(contents)} bytes")
+            
+            # Validation
+            if not file.filename:
+                raise HTTPException(status_code=400, detail="Nom de fichier manquant")
+            
+            return {"message": "Fichier reçu avec succès"}
+
+        if __name__ == "__main__":
+            uvicorn.run(app, host="0.0.0.0", port=8000)
