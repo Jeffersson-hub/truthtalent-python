@@ -4,12 +4,14 @@ import os
 import sys
 import json
 import traceback
+import uvicorn
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import uvicorn
+from typing import Dict, List, Optional, Any 
+
 
 # ============================================
 # CONFIGURATION CORS
@@ -32,6 +34,15 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
+
+# Ajoutez aussi un endpoint OPTIONS explicite
+@app.options("/{rest_of_path:path}")
+async def options_handler(rest_of_path: str):
+    return {
+        "allowed_methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allowed_headers": ["*"],
+        "allowed_origins": ["https://truthtalent.online"]
+    }
 
 # Ajouter le chemin parent pour les imports
 current_dir = os.path.dirname(os.path.abspath(__file__))

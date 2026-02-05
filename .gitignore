@@ -9,3 +9,5 @@ __pycache__/
 .env.local
 *.log
 *.sqlite3
+.vercel
+.env*.local

@@ -1,0 +1,45 @@
+{
+    // DÉSACTIVER COMPLÈTEMENT l'analyse Python
+    "python.languageServer": "None",
+    "python.analysis.enabled": false,
+    "python.linting.enabled": false,
+    "python.formatting.enabled": false,
+    "python.testing.enabled": false,
+    
+    // Utiliser Python système
+    "python.defaultInterpreterPath": "/usr/local/bin/python3",
+    
+    // Désactiver tous les diagnostics
+    "python.analysis.diagnosticMode": "openFilesOnly",
+    "python.analysis.typeCheckingMode": "off",
+    
+    // Ignorer tous les avertissements
+    "python.analysis.diagnosticSeverityOverrides": {
+        "*": "none"
+    },
+    
+    // Désactiver IntelliSense problématique
+    "editor.quickSuggestions": {
+        "other": false,
+        "comments": false,
+        "strings": false
+    },
+    
+    // Ne pas analyser ces dossiers
+    "files.watcherExclude": {
+        "**/.git/**": true,
+        "**/node_modules/**": true,
+        "**/__pycache__/**": true,
+        "**/*.pyc": true
+    },
+    
+    // Désactiver la vérification de code
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "never",
+        "source.fixAll": "never"
+    },
+    
+    // Désactiver les suggestions automatiques
+    "editor.suggestOnTriggerCharacters": false,
+    "editor.acceptSuggestionOnEnter": "off"
+}
