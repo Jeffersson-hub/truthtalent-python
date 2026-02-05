@@ -1,26 +1,15 @@
 {
   "version": 2,
-  "functions": {
-    "api.py": {
-      "maxDuration": 30
+  "builds": [
+    {
+      "src": "api.py",
+      "use": "@vercel/python"
     }
-  },
-  "rewrites": [
+  ],
+  "routes": [
     {
-      "source": "/",
-      "destination": "/api.py"
-    },
-    {
-      "source": "/health",
-      "destination": "/api.py"
-    },
-    {
-      "source": "/jobs",
-      "destination": "/api.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api.py"
+      "src": "/(.*)",
+      "dest": "/api.py"
     }
   ]
 }
