@@ -1,5 +1,9 @@
 {
-  "version": 2,
+  "functions": {
+    "api/*.py": {
+      "runtime": "python@3.9"
+    }
+  },
   "builds": [
     {
       "src": "api/index.py",
@@ -11,8 +15,5 @@
       "src": "/(.*)",
       "dest": "api/index.py"
     }
-  ],
-  "env": {
-    "PYTHONPATH": "/var/task:/var/task/lib"
-  }
+  ]
 }
