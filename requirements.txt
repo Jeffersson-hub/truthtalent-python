@@ -1,7 +1,11 @@
+# requirements-minimal.txt (Utilise CELUI-CI)
 fastapi==0.104.1
-uvicorn==0.24.0
+uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 pdfplumber==0.10.3
 python-docx==1.1.0
-supabase==1.0.3
-spacy==3.7.2
+supabase==2.3.1
+pydantic==2.5.0
+requests==2.31.0
+python-dotenv==1.0.0
+spacy==3.7.2  # Essayons sans blis d'abord

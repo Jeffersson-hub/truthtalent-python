@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "10000:10000"
+    environment:
+      - PORT=10000
+      - PYTHONUNBUFFERED=true
+    volumes:
+      - ./app.py:/app/app.py
+      - ./lib:/app/lib
