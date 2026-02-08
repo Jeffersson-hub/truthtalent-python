@@ -1,6 +1,11 @@
 # app.py - Utilise une API PDF externe GRATUITE
-import requests
-import base64
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+import requests  # <-- CELUI-CI MANQUE
+import re
+import PyPDF2
+import io
 import os
 
 def extract_pdf_via_external_api(pdf_content: bytes) -> str:
