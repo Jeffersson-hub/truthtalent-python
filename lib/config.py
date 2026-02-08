@@ -1,20 +1,29 @@
-# lib/config.py
 import os
-from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Config:
-    @staticmethod
-    def get_supabase_url() -> str:
-        return os.getenv('SUPABASE_URL', '')
+    # Render
+    PORT = int(os.getenv("PORT", 10000))
+    HOST = "0.0.0.0"
     
-    @staticmethod
-    def get_supabase_key() -> str:
-        return os.getenv('SUPABASE_SERVICE_KEY', '')
+    # Supabase
+    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
     
-    @staticmethod
-    def is_vercel() -> bool:
-        return bool(os.getenv('VERCEL', ''))
+    # Frontend
+    FRONTEND_URL = os.getenv("ALLOWED_ORIGINS", "https://truthtalent.online").split(",")[0]
     
-    @staticmethod
-    def get_environment() -> str:
-        return "vercel" if Config.is_vercel() else "local"
+    # API
+    API_URL = os.getenv("RENDER_EXTERNAL_URL", f"http://localhost:{PORT}")
+    
+    @classmethod
+    def validate(cls):
+        """Valide la configuration"""
+        errors = []
+        if not cls.SUPABASE_URL:
+            errors.append("SUPABASE_URL manquant")
+        if not cls.SUPABASE_KEY:
+            errors.append("SUPABASE_KEY manquant")
+        return errors
