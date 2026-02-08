@@ -1,46 +1,112 @@
-# app.py - Utilise une API PDF externe GRATUITE
-from fastapi import FastAPI, UploadFile, File
+#!/usr/bin/env python3
+"""
+TruthTalent API - Version RENDER CORRECTE
+"""
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import uvicorn
-import requests  # <-- CELUI-CI MANQUE
-import re
-import PyPDF2
-import io
 import os
+import re
+import io
 
-def extract_pdf_via_external_api(pdf_content: bytes) -> str:
-    """Utilise pdftotextonline.com ou similar"""
-    
-    # Option A: pdftotextonline.com (gratuit, 50 PDF/jour)
-    url = "https://pdftotextonline.com/api/extract"
-    
-    # Option B: CloudConvert (gratuit, 25 conversions/jour)
-    # url = "https://api.cloudconvert.com/v2/convert"
-    
-    # Option C: PDF.co (gratuit, 100 PDF/mois)
-    # url = "https://api.pdf.co/v1/pdf/convert/to/text"
-    
-    files = {'file': ('cv.pdf', pdf_content, 'application/pdf')}
-    
+# ========== D'ABORD, CRÉER 'app' ==========
+app = FastAPI(title="TruthTalent API")
+
+# ========== ENSUITE, MIDDLEWARE ==========
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ========== MAINTENANT LES ROUTES ==========
+@app.get("/")
+def home():
+    return {
+        "api": "TruthTalent",
+        "status": "running",
+        "environment": "Render",
+        "version": "1.0"
+    }
+
+@app.get("/health")
+def health():
+    return {"healthy": True, "service": "TruthTalent API"}
+
+@app.post("/extract")
+async def extract(file: UploadFile = File(...)):
+    """Extrait les infos d'un CV (PDF ou TXT)"""
     try:
-        response = requests.post(url, files=files)
-        if response.status_code == 200:
-            return response.text
-    except:
-        pass
-    
-    return ""
+        # Validation
+        if not file.filename:
+            raise HTTPException(400, "Nom de fichier manquant")
+        
+        # Lire le fichier
+        content = await file.read()
+        
+        # Détecter le type
+        is_pdf = file.filename.lower().endswith('.pdf')
+        
+        # Extraire le texte (version simplifiée)
+        text = ""
+        if is_pdf:
+            # Pour PDF - version simple (à améliorer)
+            try:
+                import PyPDF2
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+                for page in pdf_reader.pages:
+                    text += page.extract_text() or ""
+            except ImportError:
+                text = "[PDF - nécessite PyPDF2]"
+                pass
+        else:
+            # Pour TXT
+            text = content.decode('utf-8', errors='ignore')
+        
+        # Extraction email
+        emails = re.findall(r'[\w\.-]+@[\w\.-]+\.\w+', text)
+        
+        # Extraction téléphone français
+        phones = re.findall(r'(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}', text)
+        
+        # Nom potentiel (première ligne non vide)
+        lines = [l.strip() for l in text.split('\n') if len(l.strip()) > 3]
+        name = lines[0] if lines else ""
+        
+        return {
+            "success": True,
+            "filename": file.filename,
+            "extracted": {
+                "email": emails[0] if emails else None,
+                "phone": phones[0] if phones else None,
+                "name": name[:100],
+                "email_count": len(emails),
+                "phone_count": len(phones)
+            },
+            "text_preview": text[:500] + ("..." if len(text) > 500 else ""),
+            "format": "pdf" if is_pdf else "txt"
+        }
+        
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
 
-@app.post("/extract-pdf")
-async def extract_pdf(file: UploadFile = File(...)):
-    """PDF via service externe"""
-    content = await file.read()
-    
-    # 1. Essaie le service externe
-    text = extract_pdf_via_external_api(content)
-    
-    # 2. Fallback: Base64 pour traitement manuel
-    if not text:
-        text = f"[PDF base64 - A traiter manuellement]\n{base64.b64encode(content).decode()[:500]}"
-    
-    return {"text": text[:1000]}
+@app.post("/test-upload")
+async def test_upload(file: UploadFile = File(...)):
+    """Juste pour tester que l'upload fonctionne"""
+    return {
+        "received": True,
+        "filename": file.filename,
+        "size": file.size,
+        "content_type": file.content_type
+    }
+
+# ========== POINT D'ENTRÉE POUR RENDER ==========
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 10000))
+    print(f"🚀 TruthTalent API démarrée sur le port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
