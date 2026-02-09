@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-TruthTalent API - Version Simplifiée sans spaCy
+TruthTalent API - Version Ultra Simplifiée
 """
 import os
 import re
 import json
 import hashlib
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
 from io import BytesIO
 
 # FastAPI
@@ -30,7 +29,7 @@ except ImportError:
     DOCX_AVAILABLE = False
 
 try:
-    from supabase import create_client, Client
+    from supabase import create_client
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
@@ -41,8 +40,8 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 # ========== APPLICATION ==========
 app = FastAPI(
-    title="TruthTalent CV Parser API",
-    description="API d'extraction de CV + Supabase",
+    title="TruthTalent CV Parser",
+    description="API d'extraction de CV",
     version="2.0.0"
 )
 
@@ -55,30 +54,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========== CV EXTRACTOR SIMPLIFIÉ ==========
+# ========== CV EXTRACTOR ULTRA SIMPLE ==========
 class SimpleCVExtractor:
-    """Extracteur de CV simplifié sans NLP"""
+    """Extracteur de CV simple"""
     
     def __init__(self):
-        self.skills_database = self._load_skills_database()
-        self.french_cities = [
-            "Paris", "Lyon", "Marseille", "Toulouse", "Nice", "Nantes",
-            "Strasbourg", "Montpellier", "Bordeaux", "Lille", "Rennes"
+        self.skills_list = [
+            "Python", "Java", "C#", "PHP", "Ruby", "Node.js", "JavaScript",
+            "TypeScript", "React", "Vue.js", "Angular", "Docker", "Kubernetes",
+            "AWS", "Azure", "GCP", "SQL", "PostgreSQL", "MySQL", "MongoDB",
+            "Git", "Linux", "HTML", "CSS", "REST", "API"
         ]
-    
-    def _load_skills_database(self) -> Dict[str, List[str]]:
-        """Base de données de compétences"""
-        return {
-            "backend": ["Python", "Java", "C#", "PHP", "Ruby", "Node.js", "Go", "Rust"],
-            "frontend": ["JavaScript", "TypeScript", "React", "Vue.js", "Angular", "Svelte"],
-            "devops": ["Docker", "Kubernetes", "AWS", "Azure", "GCP", "Terraform"],
-            "mobile": ["Swift", "Kotlin", "Flutter", "React Native"],
-            "database": ["SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis"],
-            "data": ["Python", "R", "TensorFlow", "PyTorch", "Pandas", "NumPy"],
-            "design": ["Figma", "Adobe XD", "Sketch", "Photoshop"],
-            "management": ["Jira", "Confluence", "Trello", "Notion"],
-            "soft_skills": ["Communication", "Leadership", "Teamwork"]
-        }
     
     def extract_text(self, file_content: bytes, filename: str) -> str:
         """Extrait le texte selon le format"""
@@ -95,7 +81,7 @@ class SimpleCVExtractor:
                 return f"[Fichier: {filename}]"
                 
         except Exception as e:
-            print(f"⚠️ Erreur extraction: {e}")
+            print(f"Warning: {e}")
             return ""
     
     def _extract_pdf_text(self, file_content: bytes) -> str:
@@ -109,7 +95,7 @@ class SimpleCVExtractor:
                     text_parts.append(page_text)
             return "\n".join(text_parts)
         except Exception as e:
-            return f"PDF (erreur: {str(e)[:100]})"
+            return ""
     
     def _extract_docx_text(self, file_content: bytes) -> str:
         """Extrait le texte d'un document Word"""
@@ -117,77 +103,52 @@ class SimpleCVExtractor:
             doc = Document(BytesIO(file_content))
             return "\n".join([para.text for para in doc.paragraphs])
         except Exception as e:
-            return f"DOCX (erreur: {str(e)[:100]})"
+            return ""
     
-    def analyze_cv(self, text: str, filename: str = "") -> Dict[str, Any]:
+    def analyze_cv(self, text: str, filename: str = "") -> dict:
         """Analyse un CV"""
-        # Nettoyer le texte
-        clean_text = self._clean_text(text)
-        
         # Extraire les informations
-        personal_info = self._extract_personal_info(clean_text)
-        skills = self._extract_skills(clean_text)
-        languages = self._extract_languages(clean_text)
+        email = self._extract_email(text)
+        phone = self._extract_phone(text)
+        name = self._extract_name(text)
+        skills = self._extract_skills(text)
         
         # Calculer le score de confiance
-        confidence_score = self._calculate_confidence({
-            "personal_info": personal_info,
-            "skills": skills,
-            "languages": languages
-        })
+        confidence = 0.0
+        if email:
+            confidence += 0.4
+        if phone:
+            confidence += 0.3
+        if name and name != "Candidat":
+            confidence += 0.3
         
-        # Préparer le résultat
         return {
             "success": True,
             "analysis": {
-                "confidence_score": confidence_score,
-                "processing_date": datetime.now().isoformat(),
-                "char_count": len(text),
-                "word_count": len(text.split()),
-                "parser_version": "1.0"
+                "confidence_score": confidence,
+                "processing_date": datetime.now().isoformat()
             },
             "extracted": {
-                "name": personal_info.get("name", ""),
-                "email": personal_info.get("email", ""),
-                "phone": personal_info.get("phone", ""),
-                "location": personal_info.get("location", ""),
-                "linkedin": personal_info.get("linkedin", ""),
+                "name": name,
+                "email": email,
+                "phone": phone,
                 "skills": skills,
-                "languages": languages,
-                "summary": self._extract_summary(clean_text)
+                "summary": text[:200] + ("..." if len(text) > 200 else "")
             },
             "metadata": {
                 "filename": filename,
-                "original_text_preview": text[:500] + ("..." if len(text) > 500 else ""),
-                "has_email": bool(personal_info.get("email")),
-                "has_phone": bool(personal_info.get("phone")),
-                "has_name": bool(personal_info.get("name"))
+                "char_count": len(text)
             }
         }
     
-    def _clean_text(self, text: str) -> str:
-        """Nettoie le texte"""
-        text = re.sub(r'\s+', ' ', text)
-        text = re.sub(r'\n+', '\n', text)
-        return text.strip()
-    
-    def _extract_personal_info(self, text: str) -> Dict[str, str]:
-        """Extrait les informations personnelles"""
-        info = {
-            "name": "",
-            "email": "",
-            "phone": "",
-            "location": "",
-            "linkedin": ""
-        }
-        
-        # Email
+    def _extract_email(self, text: str) -> str:
+        """Extrait l'email"""
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         emails = re.findall(email_pattern, text)
-        if emails:
-            info["email"] = emails[0]
-        
-        # Téléphone français
+        return emails[0] if emails else ""
+    
+    def _extract_phone(self, text: str) -> str:
+        """Extrait le téléphone"""
         phone_patterns = [
             r'(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}',
             r'\b0[1-9](?:[\s.-]?\d{2}){4}\b'
@@ -196,107 +157,55 @@ class SimpleCVExtractor:
         for pattern in phone_patterns:
             matches = re.findall(pattern, text.replace(' ', ''))
             if matches:
-                info["phone"] = matches[0]
-                break
-        
-        # LinkedIn
-        linkedin_pattern = r'(?:linkedin\.com/(?:in|company)/[a-zA-Z0-9-]+)'
-        matches = re.findall(linkedin_pattern, text)
-        if matches:
-            info["linkedin"] = f"https://{matches[0]}"
-        
-        # Localisation
-        for city in self.french_cities:
-            if city in text:
-                info["location"] = city
-                break
-        
-        # Nom (première ligne significative)
+                return matches[0]
+        return ""
+    
+    def _extract_name(self, text: str) -> str:
+        """Extrait le nom"""
         lines = [line.strip() for line in text.split('\n') if line.strip()]
-        for line in lines[:5]:
+        for line in lines[:3]:
             if 3 < len(line) < 50:
                 if not any(word in line.lower() for word in ['email', 'phone', 'tel', 'cv', 'resume', '@']):
-                    info["name"] = line
-                    break
-        
-        return info
+                    return line
+        return "Candidat"
     
-    def _extract_skills(self, text: str) -> List[str]:
+    def _extract_skills(self, text: str) -> list:
         """Extrait les compétences"""
         found_skills = []
         text_lower = text.lower()
         
-        for category, skills in self.skills_database.items():
-            for skill in skills:
-                if skill.lower() in text_lower and skill not in found_skills:
-                    found_skills.append(skill)
+        for skill in self.skills_list:
+            if skill.lower() in text_lower and skill not in found_skills:
+                found_skills.append(skill)
         
-        return found_skills[:15]
-    
-    def _extract_languages(self, text: str) -> List[str]:
-        """Extrait les langues"""
-        languages = []
-        common_languages = [
-            "français", "anglais", "espagnol", "allemand", "italien", 
-            "portugais", "néerlandais", "chinois", "japonais"
-        ]
-        
-        text_lower = text.lower()
-        for lang in common_languages:
-            if lang in text_lower:
-                languages.append(lang.capitalize())
-        
-        return list(set(languages))
-    
-    def _extract_summary(self, text: str) -> str:
-        """Extrait un résumé"""
-        # Prendre les premières phrases significatives
-        sentences = re.split(r'[.!?]+', text)
-        for sentence in sentences:
-            sentence = sentence.strip()
-            if 5 <= len(sentence.split()) <= 30:
-                return sentence[:200]
-        
-        return ""
-    
-    def _calculate_confidence(self, data: Dict) -> float:
-        """Calcule un score de confiance"""
-        score = 0.0
-        
-        if data["personal_info"].get("email"):
-            score += 0.3
-        if data["personal_info"].get("phone"):
-            score += 0.25
-        if data["personal_info"].get("name"):
-            score += 0.25
-        if data["skills"]:
-            score += 0.2
-        
-        return min(score, 1.0)
+        return found_skills[:10]
 
 # Instance globale
 cv_extractor = SimpleCVExtractor()
 
 # ========== SUPABASE MANAGER ==========
 class SupabaseManager:
-    """Gestionnaire Supabase"""
+    """Gestionnaire Supabase simplifié"""
     
     def __init__(self):
         self.supabase_url = SUPABASE_URL
         self.supabase_key = SUPABASE_KEY
         
         if SUPABASE_AVAILABLE and self.supabase_key:
-            self.client = create_client(self.supabase_url, self.supabase_key)
-            print("✅ Connexion Supabase établie")
+            try:
+                self.client = create_client(self.supabase_url, self.supabase_key)
+                print("✅ Supabase connected")
+            except Exception as e:
+                print(f"⚠️ Supabase error: {e}")
+                self.client = None
         else:
             self.client = None
-            print("⚠️ Supabase non disponible")
+            print("⚠️ Supabase not configured")
     
-    def save_candidate(self, cv_data: Dict, file_hash: str, filename: str, 
-                      wp_user_id: Optional[int] = None, offer_id: Optional[int] = None) -> Dict:
+    def save_candidate(self, cv_data: dict, file_hash: str, filename: str) -> dict:
         """Sauvegarde un candidat"""
         if not self.client:
-            return {"success": False, "error": "Supabase non configuré"}
+            return {"success": False, "error": "Supabase not available"}
         
         try:
             extracted = cv_data.get("extracted", {})
@@ -305,31 +214,20 @@ class SupabaseManager:
                 "nom": extracted.get("name", ""),
                 "email": extracted.get("email", ""),
                 "telephone": extracted.get("phone", ""),
-                "adresse": extracted.get("location", ""),
                 "competences": json.dumps(extracted.get("skills", []), ensure_ascii=False),
-                "linkedin": extracted.get("linkedin", ""),
-                "langues": json.dumps(extracted.get("languages", []), ensure_ascii=False),
-                "raw_text": cv_data.get("metadata", {}).get("original_text_preview", "")[:5000],
-                "profil": extracted.get("summary", ""),
+                "raw_text": extracted.get("summary", ""),
                 "fichier": filename,
                 "cv_filename": filename,
-                "cv_url": "",
                 "file_hash": file_hash,
                 "status": "analysé",
                 "statut": "analysé",
                 "date_import": datetime.now().isoformat(),
                 "date_analyse": datetime.now().isoformat(),
-                "source": "api_simple",
+                "source": "api",
                 "parse_status": "success",
-                "confidence_score": cv_data.get("analysis", {}).get("confidence_score", 0.0),
-                "file_type": filename.split('.')[-1] if '.' in filename else "",
-                "wp_user_id": wp_user_id,
-                "user_id": wp_user_id,
-                "wp_offer_id": offer_id,
-                "offre_id": offer_id
+                "confidence_score": cv_data.get("analysis", {}).get("confidence_score", 0.0)
             }
             
-            # Insérer
             response = self.client.table("candidats").insert(candidate_data).execute()
             
             if response.data:
@@ -339,10 +237,10 @@ class SupabaseManager:
                     "action": "created"
                 }
             else:
-                return {"success": False, "error": "Aucune donnée retournée"}
+                return {"success": False, "error": "No data returned"}
                 
         except Exception as e:
-            print(f"❌ Erreur Supabase: {e}")
+            print(f"❌ Supabase error: {e}")
             return {"success": False, "error": str(e)}
 
 # Instance globale
@@ -352,14 +250,10 @@ supabase_manager = SupabaseManager()
 @app.get("/")
 async def root():
     return {
-        "service": "TruthTalent CV Parser API",
+        "service": "TruthTalent CV Parser",
         "version": "2.0.0",
         "status": "online",
-        "features": {
-            "pdf_parsing": PDF_AVAILABLE,
-            "docx_parsing": DOCX_AVAILABLE,
-            "supabase": SUPABASE_AVAILABLE and bool(SUPABASE_KEY)
-        }
+        "endpoints": ["/health", "/extract", "/process-wordpress-upload"]
     }
 
 @app.get("/health")
@@ -367,11 +261,7 @@ async def health():
     return {
         "healthy": True,
         "timestamp": datetime.now().isoformat(),
-        "components": {
-            "api": "operational",
-            "extractor": "ready",
-            "supabase": "ready" if supabase_manager.client else "disabled"
-        }
+        "supabase": "connected" if supabase_manager.client else "disabled"
     }
 
 @app.post("/extract")
@@ -379,25 +269,22 @@ async def extract_cv(file: UploadFile = File(...)):
     """Analyse un CV"""
     try:
         if not file.filename:
-            raise HTTPException(400, "Nom de fichier manquant")
+            raise HTTPException(400, "Filename required")
         
         file_content = await file.read()
         
         if len(file_content) == 0:
-            raise HTTPException(400, "Fichier vide")
-        
-        if len(file_content) > 10 * 1024 * 1024:
-            raise HTTPException(400, "Fichier trop volumineux (max 10MB)")
+            raise HTTPException(400, "Empty file")
         
         # Extraire le texte
         text = cv_extractor.extract_text(file_content, file.filename)
         
-        if not text or len(text.strip()) < 20:
-            return JSONResponse({
+        if not text or len(text.strip()) < 10:
+            return {
                 "success": True,
-                "warning": "Texte insuffisant pour analyse",
+                "warning": "Insufficient text for analysis",
                 "extracted": {"filename": file.filename}
-            })
+            }
         
         # Analyser le CV
         result = cv_extractor.analyze_cv(text, file.filename)
@@ -407,49 +294,37 @@ async def extract_cv(file: UploadFile = File(...)):
         
         # Sauvegarder dans Supabase
         if supabase_manager.client:
-            save_result = supabase_manager.save_candidate(
-                cv_data=result,
-                file_hash=file_hash,
-                filename=file.filename
-            )
-            
-            if save_result["success"]:
-                result["supabase_save"] = save_result
-            else:
-                result["supabase_save"] = {"success": False, "warning": save_result.get("error")}
+            save_result = supabase_manager.save_candidate(result, file_hash, file.filename)
+            result["supabase"] = save_result
         
         return result
         
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"❌ Erreur: {e}")
         return JSONResponse(
-            {"success": False, "error": "Erreur interne"},
+            {"success": False, "error": str(e)},
             status_code=500
         )
 
 @app.post("/process-wordpress-upload")
 async def process_wordpress_upload(
     file: UploadFile = File(...),
-    wp_user_id: Optional[int] = None,
-    wp_offer_id: Optional[int] = None,
-    message: Optional[str] = None
+    wp_user_id: int = 0,
+    wp_offer_id: int = 0,
+    message: str = ""
 ):
-    """Endpoint WordPress"""
+    """Endpoint pour WordPress"""
     try:
         if not file.filename:
-            raise HTTPException(400, "Nom de fichier manquant")
+            raise HTTPException(400, "Filename required")
         
         file_content = await file.read()
         text = cv_extractor.extract_text(file_content, file.filename)
         
-        if not text or len(text.strip()) < 20:
+        if not text:
             return {
                 "success": True,
-                "warning": "Texte insuffisant",
+                "warning": "No text extracted",
                 "extracted": {
-                    "filename": file.filename,
                     "name": "Candidat",
                     "email": "",
                     "phone": "",
@@ -461,67 +336,53 @@ async def process_wordpress_upload(
         result = cv_extractor.analyze_cv(text, file.filename)
         file_hash = hashlib.md5(file_content).hexdigest()
         
-        # Sauvegarder
-        save_result = {}
+        # Sauvegarder avec infos WordPress
         if supabase_manager.client:
-            save_result = supabase_manager.save_candidate(
-                cv_data=result,
-                file_hash=file_hash,
-                filename=file.filename,
-                wp_user_id=wp_user_id,
-                offer_id=wp_offer_id
-            )
+            extracted = result.get("extracted", {})
+            
+            candidate_data = {
+                "nom": extracted.get("name", ""),
+                "email": extracted.get("email", ""),
+                "telephone": extracted.get("phone", ""),
+                "competences": json.dumps(extracted.get("skills", []), ensure_ascii=False),
+                "raw_text": extracted.get("summary", ""),
+                "fichier": file.filename,
+                "cv_filename": file.filename,
+                "file_hash": file_hash,
+                "status": "analysé",
+                "statut": "analysé",
+                "date_import": datetime.now().isoformat(),
+                "date_analyse": datetime.now().isoformat(),
+                "source": "wordpress",
+                "parse_status": "success",
+                "confidence_score": result.get("analysis", {}).get("confidence_score", 0.0),
+                "wp_user_id": wp_user_id,
+                "wp_offer_id": wp_offer_id
+            }
+            
+            if message:
+                candidate_data["message_candidature"] = message
+            
+            supabase_manager.client.table("candidats").insert(candidate_data).execute()
         
-        response = {
+        return {
             "success": True,
-            "message": "CV analysé avec succès",
+            "message": "CV processed successfully",
             "analysis": result.get("analysis", {}),
             "extracted": result.get("extracted", {}),
-            "supabase": save_result,
-            "file_info": {
-                "original_name": file.filename,
-                "file_hash": file_hash,
-                "size": len(file_content)
-            }
+            "file_hash": file_hash
         }
         
-        if message:
-            response["candidate_message"] = message
-        
-        return response
-        
     except Exception as e:
-        print(f"❌ Erreur WordPress: {e}")
         return JSONResponse(
             {"success": False, "error": str(e)},
             status_code=500
         )
 
-@app.get("/test-supabase")
-async def test_supabase():
-    """Test Supabase"""
-    if not supabase_manager.client:
-        return {"connected": False, "error": "Client non initialisé"}
-    
-    try:
-        response = supabase_manager.client.table("candidats").select("count", count="exact").limit(1).execute()
-        
-        return {
-            "connected": True,
-            "supabase_url": SUPABASE_URL,
-            "table_test": "success" if response.count is not None else "failed",
-            "count": response.count
-        }
-    except Exception as e:
-        return {"connected": False, "error": str(e)}
-
 # ========== POINT D'ENTRÉE ==========
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    print(f"🚀 TruthTalent API démarrée sur le port {port}")
-    print(f"📦 PDF support: {PDF_AVAILABLE}")
-    print(f"📄 DOCX support: {DOCX_AVAILABLE}")
-    print(f"📊 Supabase: {SUPABASE_AVAILABLE and bool(SUPABASE_KEY)}")
+    print(f"🚀 TruthTalent API started on port {port}")
     
     uvicorn.run(
         app,
