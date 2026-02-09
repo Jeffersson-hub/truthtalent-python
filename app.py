@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TruthTalent API - Version CORRIGÉE pour Supabase
+TruthTalent API - Extracteur AVANCÉ de CV
 """
 import os
 import re
@@ -41,8 +41,8 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 # ========== APPLICATION ==========
 app = FastAPI(
     title="TruthTalent CV Parser",
-    description="API d'extraction de CV",
-    version="2.0.0"
+    description="API d'extraction avancée de CV",
+    version="3.0.0"
 )
 
 # CORS
@@ -54,26 +54,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========== CV EXTRACTOR AMÉLIORÉ ==========
-class CVExtractor:
-    """Extracteur de CV amélioré"""
+# ========== CV EXTRACTOR AVANCÉ ==========
+class AdvancedCVExtractor:
+    """Extracteur de CV avancé avec parsing intelligent"""
     
     def __init__(self):
-        self.skills_list = [
-            "Python", "Java", "C#", "PHP", "Ruby", "Node.js", "JavaScript",
-            "TypeScript", "React", "Vue.js", "Angular", "Docker", "Kubernetes",
-            "AWS", "Azure", "GCP", "SQL", "PostgreSQL", "MySQL", "MongoDB",
-            "Git", "Linux", "HTML", "CSS", "REST", "API", "Flask", "Django",
-            "FastAPI", "Spring", "Laravel", "Symfony", "React Native", "Swift",
-            "Kotlin", "Go", "Rust", "TensorFlow", "PyTorch", "Pandas", "NumPy"
-        ]
+        self.skills_list = self._load_skills_database()
         self.french_cities = [
             "Paris", "Lyon", "Marseille", "Toulouse", "Nice", "Nantes",
-            "Strasbourg", "Montpellier", "Bordeaux", "Lille", "Rennes"
+            "Strasbourg", "Montpellier", "Bordeaux", "Lille", "Rennes",
+            "Toulon", "Grenoble", "Dijon", "Angers", "Le Havre"
         ]
+        self.languages = [
+            "français", "anglais", "espagnol", "allemand", "italien", 
+            "portugais", "néerlandais", "chinois", "japonais", "arabe",
+            "russe", "hindi", "coréen"
+        ]
+        self.degree_keywords = {
+            "bac": "Baccalauréat",
+            "bts": "BTS",
+            "dut": "DUT",
+            "licence": "Licence",
+            "master": "Master",
+            "mba": "MBA",
+            "doctorat": "Doctorat",
+            "phd": "PhD",
+            "ingénieur": "Diplôme d'ingénieur"
+        }
+    
+    def _load_skills_database(self):
+        """Base de données complète de compétences"""
+        return {
+            "backend": ["Python", "Java", "C#", "PHP", "Ruby", "Node.js", "Go", "Rust", "Scala", "Kotlin"],
+            "frontend": ["JavaScript", "TypeScript", "React", "Vue.js", "Angular", "Svelte", "Next.js", "Nuxt.js"],
+            "devops": ["Docker", "Kubernetes", "AWS", "Azure", "GCP", "Terraform", "Jenkins", "GitLab CI", "Ansible"],
+            "mobile": ["Swift", "Kotlin", "Flutter", "React Native", "Ionic", "Xamarin"],
+            "database": ["SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "Oracle", "SQL Server"],
+            "data": ["Python", "R", "TensorFlow", "PyTorch", "Pandas", "NumPy", "Tableau", "Power BI", "Spark"],
+            "design": ["Figma", "Adobe XD", "Sketch", "Photoshop", "Illustrator", "InDesign", "Premiere Pro"],
+            "management": ["Jira", "Confluence", "Trello", "Asana", "Notion", "Slack", "Teams"],
+            "cloud": ["AWS", "Azure", "GCP", "Heroku", "DigitalOcean", "OVH"],
+            "testing": ["Jest", "Mocha", "Cypress", "Selenium", "JUnit", "TestNG"]
+        }
     
     def extract_text(self, file_content: bytes, filename: str) -> str:
-        """Extrait le texte selon le format"""
+        """Extrait le texte du fichier"""
         filename_lower = filename.lower()
         
         try:
@@ -87,7 +112,7 @@ class CVExtractor:
                 return f"[Fichier: {filename}]"
                 
         except Exception as e:
-            print(f"Warning extraction: {e}")
+            print(f"⚠️ Erreur extraction texte: {e}")
             return ""
     
     def _extract_pdf_text(self, file_content: bytes) -> str:
@@ -101,7 +126,7 @@ class CVExtractor:
                     text_parts.append(page_text)
             return "\n".join(text_parts)
         except Exception as e:
-            print(f"PDF extraction error: {e}")
+            print(f"❌ PDF extraction error: {e}")
             return ""
     
     def _extract_docx_text(self, file_content: bytes) -> str:
@@ -110,26 +135,43 @@ class CVExtractor:
             doc = Document(BytesIO(file_content))
             return "\n".join([para.text for para in doc.paragraphs])
         except Exception as e:
-            print(f"DOCX extraction error: {e}")
+            print(f"❌ DOCX extraction error: {e}")
             return ""
     
     def analyze_cv(self, text: str, filename: str = "") -> dict:
-        """Analyse un CV"""
-        # Nettoyer le texte
-        clean_text = self._clean_text(text)
+        """Analyse complète d'un CV"""
+        print(f"🔍 Analyse du CV: {filename}")
         
-        # Extraire les informations
+        # Nettoyer et normaliser le texte
+        clean_text = self._clean_text(text)
+        print(f"   Texte nettoyé: {len(clean_text)} caractères")
+        
+        # Extraire toutes les informations
         personal_info = self._extract_personal_info(clean_text)
-        skills = self._extract_skills(clean_text)
-        experience = self._extract_experience_info(clean_text)
-        education = self._extract_education_info(clean_text)
+        print(f"   Infos perso: {personal_info.get('name')}, {personal_info.get('email')}")
+        
+        skills = self._extract_skills_comprehensive(clean_text)
+        print(f"   Compétences trouvées: {len(skills)}")
+        
+        experience = self._extract_experience_details(clean_text)
+        print(f"   Expérience: {experience.get('years', 0)} ans, {experience.get('level')}")
+        
+        education = self._extract_education_details(clean_text)
+        print(f"   Éducation: {education.get('degree')}")
+        
+        languages = self._extract_languages_details(clean_text)
+        print(f"   Langues: {len(languages)}")
         
         # Calculer le score de confiance
         confidence = self._calculate_confidence(personal_info, skills, experience)
+        print(f"   Score confiance: {confidence}")
         
         # Séparer prénom/nom
         full_name = personal_info.get("name", "Candidat")
         first_name, last_name = self._split_name(full_name)
+        
+        # Préparer les métiers (basé sur les compétences principales)
+        metiers = self._extract_metiers(skills)
         
         return {
             "success": True,
@@ -138,7 +180,7 @@ class CVExtractor:
                 "processing_date": datetime.now().isoformat(),
                 "char_count": len(text),
                 "word_count": len(text.split()),
-                "parser_version": "2.0"
+                "parser_version": "3.0"
             },
             "extracted": {
                 "name": full_name,
@@ -149,27 +191,40 @@ class CVExtractor:
                 "location": personal_info.get("location", ""),
                 "linkedin": personal_info.get("linkedin", ""),
                 "skills": skills,
+                "skills_by_category": self._categorize_skills(skills),
+                "languages": languages,
                 "experience_years": experience.get("years", 0),
-                "experience_details": experience.get("details", ""),
-                "education": education.get("details", ""),
-                "summary": text[:500] + ("..." if len(text) > 500 else "")
+                "experience_level": experience.get("level", ""),
+                "experience_details": experience.get("positions", []),
+                "education_degree": education.get("degree", ""),
+                "education_institution": education.get("institution", ""),
+                "education_details": education.get("details", []),
+                "summary": self._extract_summary(clean_text),
+                "metiers": metiers
             },
             "metadata": {
                 "filename": filename,
-                "original_text_preview": text[:1000] if len(text) > 1000 else text
+                "original_text_preview": text[:1000] if len(text) > 1000 else text,
+                "has_email": bool(personal_info.get("email")),
+                "has_phone": bool(personal_info.get("phone")),
+                "has_name": bool(personal_info.get("name")),
+                "has_skills": bool(skills),
+                "has_experience": bool(experience.get("years", 0) > 0)
             }
         }
     
     def _clean_text(self, text: str) -> str:
-        """Nettoie le texte"""
+        """Nettoie et normalise le texte"""
         # Supprimer les caractères de contrôle
         text = re.sub(r'[\x00-\x1F\x7F-\x9F]', ' ', text)
         # Normaliser les espaces
         text = re.sub(r'\s+', ' ', text)
+        # Normaliser les retours à la ligne
+        text = re.sub(r'\n+', '\n', text)
         return text.strip()
     
     def _extract_personal_info(self, text: str) -> dict:
-        """Extrait les informations personnelles"""
+        """Extrait les informations personnelles de manière robuste"""
         info = {
             "name": "",
             "email": "",
@@ -178,172 +233,474 @@ class CVExtractor:
             "linkedin": ""
         }
         
-        # Email
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        emails = re.findall(email_pattern, text)
-        if emails:
-            info["email"] = emails[0]
+        # 1. EMAIL - Recherche approfondie
+        email_patterns = [
+            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            r'[Ee]-?[Mm][Aa][Ii][Ll]\s*[:]\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})',
+            r'[Cc]ontact\s*[:]\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})'
+        ]
         
-        # Téléphone français
+        for pattern in email_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                if isinstance(matches[0], tuple):
+                    info["email"] = matches[0][0]
+                else:
+                    info["email"] = matches[0]
+                break
+        
+        # 2. TÉLÉPHONE - Formats français/internationaux
         phone_patterns = [
-            r'(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}',
+            r'(?:(?:\+|00)33\s?|0)[1-9](?:[\s.-]?\d{2}){4}',
             r'\b0[1-9](?:[\s.-]?\d{2}){4}\b',
-            r'\b\d{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{2}\b'
+            r'\b\d{2}[.\s]?\d{2}[.\s]?\d{2}[.\s]?\d{2}[.\s]?\d{2}\b',
+            r'T[ée]l[\.]?\s*[:]?\s*(\+?\d[\d\s.-]{8,}\d)',
+            r'[Pp]hone\s*[:]?\s*(\+?\d[\d\s.-]{8,}\d)'
         ]
         
         for pattern in phone_patterns:
-            matches = re.findall(pattern, text.replace(' ', ''))
+            matches = re.findall(pattern, text)
             if matches:
-                info["phone"] = matches[0]
-                break
+                phone = matches[0] if isinstance(matches[0], str) else matches[0][0]
+                # Nettoyer le numéro
+                phone = re.sub(r'[^\d+]', '', phone)
+                if len(phone) >= 10:
+                    info["phone"] = phone
+                    break
         
-        # LinkedIn
+        # 3. LINKEDIN
         linkedin_patterns = [
-            r'linkedin\.com/in/[a-zA-Z0-9-]+',
-            r'linkedin\.com/company/[a-zA-Z0-9-]+'
+            r'(?:linkedin\.com/(?:in|company)/[a-zA-Z0-9-]+)',
+            r'[Ll]inked[Ii]n\s*[:]\s*(?:linkedin\.com/(?:in|company)/[a-zA-Z0-9-]+)',
+            r'[Pp]rofil\s+[Ll]inked[Ii]n\s*[:].*?(linkedin\.com/(?:in|company)/[a-zA-Z0-9-]+)'
         ]
         
         for pattern in linkedin_patterns:
             matches = re.findall(pattern, text)
             if matches:
-                info["linkedin"] = f"https://{matches[0]}"
+                linkedin = matches[0]
+                if not linkedin.startswith('http'):
+                    linkedin = f"https://{linkedin}"
+                info["linkedin"] = linkedin
                 break
         
-        # Localisation
+        # 4. LOCALISATION
         for city in self.french_cities:
-            if city in text:
+            if re.search(r'\b' + re.escape(city) + r'\b', text, re.IGNORECASE):
                 info["location"] = city
                 break
         
-        # Nom (première ligne significative)
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
-        for line in lines[:5]:
-            if 3 < len(line) < 50:
-                if not any(word in line.lower() for word in ['email', 'phone', 'tel', 'cv', 'resume', '@', 'linkedin']):
+        # 5. NOM - Algorithmie avancée
+        lines = text.split('\n')
+        
+        # Stratégie 1: Chercher un nom en début de document (haut du CV)
+        for i in range(min(10, len(lines))):
+            line = lines[i].strip()
+            if 2 <= len(line.split()) <= 4 and len(line) > 3 and len(line) < 50:
+                # Vérifier que ce n'est pas un en-tête ou une section
+                if not any(word in line.lower() for word in [
+                    'cv', 'curriculum', 'vitae', 'resume', 'profil',
+                    'experience', 'expérience', 'formation', 'education',
+                    'compétences', 'skills', 'contact', 'coordonnées'
+                ]):
+                    # Vérifier qu'il n'y a pas d'email ou téléphone
+                    if not re.search(r'@|\d{10}', line):
+                        info["name"] = line
+                        break
+        
+        # Stratégie 2: Chercher autour des mots-clés "Nom", "Prénom"
+        if not info["name"]:
+            name_patterns = [
+                r'[Nn]om\s*[:]\s*([^\n]{2,30})',
+                r'[Pp]r[ée]nom\s*[:]\s*([^\n]{2,20})',
+                r'[Ff]ull\s+[Nn]ame\s*[:]\s*([^\n]{2,30})'
+            ]
+            
+            for pattern in name_patterns:
+                matches = re.findall(pattern, text)
+                if matches:
+                    info["name"] = matches[0].strip()
+                    break
+        
+        # Stratégie 3: Première ligne significative sans caractères spéciaux
+        if not info["name"]:
+            for line in lines[:5]:
+                line = line.strip()
+                if (3 <= len(line) <= 40 and 
+                    not re.search(r'[@\d{10}]', line) and
+                    not any(word in line.lower() for word in ['email', 'phone', 'tel', 'cv', 'resume'])):
                     info["name"] = line
                     break
         
-        # Si pas de nom trouvé, utiliser "Candidat"
         if not info["name"]:
             info["name"] = "Candidat"
         
         return info
     
     def _split_name(self, full_name: str) -> tuple:
-        """Sépare le prénom et le nom"""
+        """Sépare intelligemment le prénom et le nom"""
         if not full_name or full_name == "Candidat":
             return "", ""
         
-        parts = full_name.strip().split()
+        # Nettoyer le nom
+        name = full_name.strip()
+        
+        # Retirer les titres
+        titles = ['M.', 'Mme', 'Mr', 'Mrs', 'Ms', 'Dr', 'Prof']
+        for title in titles:
+            if name.startswith(title):
+                name = name[len(title):].strip()
+        
+        parts = name.split()
+        
         if len(parts) == 1:
             return parts[0], ""
         elif len(parts) == 2:
             return parts[0], parts[1]
         else:
-            # Heuristique: prénom = premier mot, nom = autres mots
-            return parts[0], " ".join(parts[1:])
+            # Heuristique: prénom = premier mot, nom = derniers mots
+            first_name = parts[0]
+            last_name = " ".join(parts[1:])
+            return first_name, last_name
     
-    def _extract_skills(self, text: str) -> list:
-        """Extrait les compétences"""
+    def _extract_skills_comprehensive(self, text: str) -> list:
+        """Extrait les compétences de manière exhaustive"""
         found_skills = []
         text_lower = text.lower()
         
-        for skill in self.skills_list:
-            if skill.lower() in text_lower and skill not in found_skills:
-                found_skills.append(skill)
+        # Rechercher toutes les compétences par catégorie
+        for category, skills in self.skills_list.items():
+            for skill in skills:
+                # Recherche insensible à la casse
+                if skill.lower() in text_lower:
+                    # Vérifier que ce n'est pas un faux positif
+                    skill_pattern = r'\b' + re.escape(skill) + r'\b'
+                    if re.search(skill_pattern, text, re.IGNORECASE):
+                        if skill not in found_skills:
+                            found_skills.append(skill)
         
-        return found_skills[:20]
-    
-    def _extract_experience_info(self, text: str) -> dict:
-        """Extrait les informations d'expérience"""
-        # Chercher des années d'expérience
-        year_patterns = [
-            r'(\d+)\s*(ans|années|years|yr)',
-            r'expérience\s*:\s*(\d+)',
-            r'(\d+)\+?\s*ans?'
+        # Rechercher des compétences par motifs
+        skill_patterns = [
+            r'(?:compétences|skills)\s*[:]([^:]{10,500})',
+            r'(?:expertise|expertises)\s*[:]([^:]{10,500})',
+            r'(?:technologies|technologies?)\s*[:]([^:]{10,500})'
         ]
         
-        years = 0
+        for pattern in skill_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                skills_text = matches[0].lower()
+                # Chercher des mots-clés techniques
+                tech_keywords = ['python', 'java', 'javascript', 'react', 'docker', 'aws']
+                for keyword in tech_keywords:
+                    if keyword in skills_text:
+                        skill_name = keyword.capitalize()
+                        if skill_name not in found_skills:
+                            found_skills.append(skill_name)
+        
+        return found_skills[:25]  # Limiter à 25 compétences
+    
+    def _categorize_skills(self, skills: list) -> dict:
+        """Catégorise les compétences"""
+        categorized = {}
+        for category, category_skills in self.skills_list.items():
+            category_found = []
+            for skill in skills:
+                if skill in category_skills:
+                    category_found.append(skill)
+            if category_found:
+                categorized[category] = category_found
+        return categorized
+    
+    def _extract_languages_details(self, text: str) -> list:
+        """Extrait les langues avec leur niveau"""
+        languages_found = []
+        text_lower = text.lower()
+        
+        # Chercher une section langues
+        lang_section_patterns = [
+            r'[Ll]angues?\s*[:]([^:]{10,300})',
+            r'[Ll]anguages?\s*[:]([^:]{10,300})'
+        ]
+        
+        lang_section = ""
+        for pattern in lang_section_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                lang_section = matches[0]
+                break
+        
+        # Si pas de section, chercher dans tout le texte
+        if not lang_section:
+            lang_section = text_lower
+        
+        # Niveaux de langue
+        levels = {
+            'débutant': 'Débutant',
+            'intermédiaire': 'Intermédiaire',
+            'avancé': 'Avancé',
+            'courant': 'Courant',
+            'natif': 'Natif',
+            'bilingue': 'Bilingue',
+            'beginner': 'Débutant',
+            'intermediate': 'Intermédiaire',
+            'advanced': 'Avancé',
+            'fluent': 'Courant',
+            'native': 'Natif',
+            'bilingual': 'Bilingue'
+        }
+        
+        for lang in self.languages:
+            lang_pattern = r'\b' + re.escape(lang) + r'\b'
+            if re.search(lang_pattern, lang_section, re.IGNORECASE):
+                # Chercher le niveau associé
+                lang_with_level = lang.capitalize()
+                
+                # Chercher le niveau dans les 10 mots autour de la langue
+                words = lang_section.split()
+                for i, word in enumerate(words):
+                    if lang in word:
+                        # Chercher niveau avant ou après
+                        for j in range(max(0, i-3), min(len(words), i+4)):
+                            if words[j] in levels:
+                                lang_with_level += f" ({levels[words[j]]})"
+                                break
+                
+                if lang_with_level not in languages_found:
+                    languages_found.append(lang_with_level)
+        
+        return languages_found
+    
+    def _extract_experience_details(self, text: str) -> dict:
+        """Extrait les détails d'expérience"""
+        result = {
+            "years": 0,
+            "level": "",
+            "positions": []
+        }
+        
+        # 1. Extraire les années d'expérience
+        year_patterns = [
+            r'(\d+)\s*(?:ans|années|years|yr)s?\s*(?:d\'?expérience|experience)',
+            r'expérience\s*(?:professionnelle)?\s*[:=]\s*(\d+)\s*(?:ans|années|years)',
+            r'(\d+)\+?\s*(?:ans|années)',
+            r'(\d+)\s*ans?\s*d\'?exp'
+        ]
+        
         for pattern in year_patterns:
-            matches = re.findall(pattern, text.lower())
+            matches = re.findall(pattern, text, re.IGNORECASE)
             if matches:
                 try:
-                    for match in matches:
-                        if isinstance(match, tuple):
-                            for item in match:
-                                if item.isdigit():
-                                    years = int(item)
-                                    break
-                        elif isinstance(match, str) and match.isdigit():
-                            years = int(match)
-                    if years > 0:
-                        break
+                    years = int(matches[0])
+                    result["years"] = years
+                    break
                 except:
                     pass
         
-        # Détecter si c'est un senior/junior
-        details = ""
-        if "senior" in text.lower() or "expérimenté" in text.lower():
-            details = "Expérimenté"
-        elif "junior" in text.lower() or "débutant" in text.lower():
-            details = "Junior"
-        else:
-            details = "Intermédiaire"
-        
-        return {
-            "years": years,
-            "details": details
+        # 2. Déterminer le niveau
+        level_keywords = {
+            "senior": ["senior", "lead", "principal", "architect", "expert", "chef", "manager", "directeur"],
+            "mid-level": ["mid-level", "intermediate", "confirmed", "expérimenté", "confirmé"],
+            "junior": ["junior", "entry", "débutant", "graduate", "jeune diplômé"],
+            "intern": ["intern", "stagiaire", "apprenti", "alternance", "apprentissage"]
         }
-    
-    def _extract_education_info(self, text: str) -> dict:
-        """Extrait les informations de formation"""
-        education_keywords = [
-            "université", "école", "master", "licence", "bac", "diplôme",
-            "formation", "certification", "mba", "doctorat"
+        
+        text_lower = text.lower()
+        for level, keywords in level_keywords.items():
+            for keyword in keywords:
+                if keyword in text_lower:
+                    result["level"] = level
+                    break
+            if result["level"]:
+                break
+        
+        # Si pas de niveau détecté, estimer d'après l'expérience
+        if not result["level"]:
+            if result["years"] >= 7:
+                result["level"] = "senior"
+            elif result["years"] >= 3:
+                result["level"] = "mid-level"
+            elif result["years"] > 0:
+                result["level"] = "junior"
+            else:
+                result["level"] = "intern"
+        
+        # 3. Extraire les postes
+        position_patterns = [
+            r'\b(?:20\d{2}|19\d{2})\s*[-–]\s*(?:présent|actuel|20\d{2}|19\d{2})',
+            r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\s*[-–]',
+            r'\b(?:janv|fév|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-z]*\s+\d{4}\s*[-–]'
         ]
         
-        details = ""
-        for keyword in education_keywords:
-            if keyword in text.lower():
-                # Trouver la ligne avec le mot-clé
-                lines = text.split('\n')
-                for i, line in enumerate(lines):
-                    if keyword in line.lower():
-                        details = line.strip()
-                        # Ajouter les lignes suivantes si pertinentes
-                        for j in range(i+1, min(i+3, len(lines))):
-                            next_line = lines[j].strip()
-                            if next_line and len(next_line) > 5:
-                                details += f" | {next_line}"
-                        break
-                if details:
+        lines = text.split('\n')
+        for i, line in enumerate(lines):
+            for pattern in position_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    position_info = {
+                        "period": re.search(pattern, line, re.IGNORECASE).group(),
+                        "title": self._extract_job_title(line),
+                        "company": self._extract_company(line)
+                    }
+                    result["positions"].append(position_info)
                     break
         
-        return {"details": details}
+        return result
+    
+    def _extract_job_title(self, line: str) -> str:
+        """Extrait le titre du poste"""
+        # Retirer les dates
+        line = re.sub(r'\b(?:20\d{2}|19\d{2})\s*[-–].*', '', line)
+        line = re.sub(r'\b(?:jan|feb|mar)[a-z]*\s+\d{4}\s*[-–].*', '', line, flags=re.IGNORECASE)
+        
+        # Retirer les indicateurs
+        indicators = ["chez", "at", "|", "-", "•", "·", ":", ";"]
+        for indicator in indicators:
+            if indicator in line:
+                parts = line.split(indicator)
+                line = parts[0].strip()
+                break
+        
+        return line.strip()[:100]
+    
+    def _extract_company(self, line: str) -> str:
+        """Extrait le nom de l'entreprise"""
+        indicators = ["chez", "at", "|", "-", "•", "·", ":", ";"]
+        for indicator in indicators:
+            if indicator in line:
+                parts = line.split(indicator)
+                if len(parts) > 1:
+                    return parts[1].strip()[:100]
+        return ""
+    
+    def _extract_education_details(self, text: str) -> dict:
+        """Extrait les détails de formation"""
+        result = {
+            "degree": "",
+            "institution": "",
+            "details": []
+        }
+        
+        # Chercher une section éducation
+        edu_patterns = [
+            r'[ÉEe]ducation\s*[:]([^:]{10,500})',
+            r'[Ff]ormation\s*[:]([^:]{10,500})',
+            r'[Pp]arcours\s+[Aa]cad[ée]mique\s*[:]([^:]{10,500})'
+        ]
+        
+        edu_section = ""
+        for pattern in edu_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                edu_section = matches[0]
+                break
+        
+        # Si pas de section, chercher dans tout le texte
+        if not edu_section:
+            edu_section = text
+        
+        # Chercher les diplômes
+        for keyword, degree in self.degree_keywords.items():
+            if re.search(r'\b' + re.escape(keyword) + r'\b', edu_section, re.IGNORECASE):
+                result["degree"] = degree
+                break
+        
+        # Chercher les établissements
+        institutions = ["université", "école", "institut", "faculté", "polytechnique"]
+        lines = edu_section.split('\n')
+        for line in lines:
+            for inst in institutions:
+                if inst in line.lower():
+                    result["institution"] = line.strip()
+                    break
+            if result["institution"]:
+                break
+        
+        # Collecter les détails
+        lines = edu_section.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line and len(line) > 10 and not any(word in line.lower() for word in ['education', 'formation']):
+                result["details"].append(line)
+        
+        return result
+    
+    def _extract_metiers(self, skills: list) -> str:
+        """Extrait les métiers basés sur les compétences"""
+        metier_mapping = {
+            "développeur": ["Python", "Java", "JavaScript", "C#", "PHP"],
+            "devops": ["Docker", "Kubernetes", "AWS", "Terraform", "Jenkins"],
+            "data scientist": ["Python", "TensorFlow", "PyTorch", "Pandas", "R"],
+            "designer": ["Figma", "Adobe XD", "Sketch", "Photoshop", "Illustrator"],
+            "administrateur": ["SQL", "PostgreSQL", "MySQL", "Linux", "Windows"]
+        }
+        
+        metiers = []
+        for metier, required_skills in metier_mapping.items():
+            matches = sum(1 for skill in skills if skill in required_skills)
+            if matches >= 2:  # Au moins 2 compétences correspondantes
+                metiers.append(metier)
+        
+        return ", ".join(metiers) if metiers else "Développeur"
+    
+    def _extract_summary(self, text: str) -> str:
+        """Extrait un résumé du CV"""
+        # Chercher une section profil/résumé
+        summary_patterns = [
+            r'[Pp]rofil\s*[:]([^:]{20,300})',
+            r'[Ss]ummary\s*[:]([^:]{20,300})',
+            r'[ÀAàa]\s+[Pp]ropos\s*[:]([^:]{20,300})',
+            r'[Oo]bjectif\s*[:]([^:]{20,300})'
+        ]
+        
+        for pattern in summary_patterns:
+            matches = re.findall(pattern, text)
+            if matches:
+                return matches[0].strip()[:500]
+        
+        # Sinon, prendre les premières phrases significatives
+        sentences = re.split(r'[.!?]+', text)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if 10 <= len(sentence.split()) <= 30:
+                keywords = ["expérience", "compétences", "spécialisé", "passionné", "expert"]
+                if any(keyword in sentence.lower() for keyword in keywords):
+                    return sentence[:300]
+        
+        # Fallback
+        return text[:200] + ("..." if len(text) > 200 else "")
     
     def _calculate_confidence(self, personal_info: dict, skills: list, experience: dict) -> float:
         """Calcule le score de confiance"""
         score = 0.0
         
+        # Points pour informations personnelles
         if personal_info.get("email"):
             score += 0.3
         if personal_info.get("phone"):
             score += 0.25
-        if personal_info.get("name") and personal_info.get("name") != "Candidat":
+        if personal_info.get("name") and personal_info["name"] != "Candidat":
             score += 0.2
+        if personal_info.get("location"):
+            score += 0.05
+        
+        # Points pour compétences
         if skills:
-            score += 0.15
+            score += min(0.2, len(skills) * 0.01)
+        
+        # Points pour expérience
         if experience.get("years", 0) > 0:
             score += 0.1
+        if experience.get("positions"):
+            score += 0.05
         
         return min(score, 1.0)
 
 # Instance globale
-cv_extractor = CVExtractor()
+cv_extractor = AdvancedCVExtractor()
 
-# ========== SUPABASE MANAGER CORRIGÉ ==========
+# ========== SUPABASE MANAGER AMÉLIORÉ ==========
 class SupabaseManager:
-    """Gestionnaire Supabase corrigé pour votre schéma"""
+    """Gestionnaire Supabase amélioré"""
     
     def __init__(self):
         self.supabase_url = SUPABASE_URL
@@ -352,58 +709,74 @@ class SupabaseManager:
         if SUPABASE_AVAILABLE and self.supabase_key:
             try:
                 self.client = create_client(self.supabase_url, self.supabase_key)
-                print("✅ Supabase connected successfully")
+                print("✅ Supabase connecté avec succès")
             except Exception as e:
-                print(f"❌ Supabase connection error: {e}")
+                print(f"❌ Erreur connexion Supabase: {e}")
                 self.client = None
         else:
             self.client = None
-            print("⚠️ Supabase not configured")
+            print("⚠️ Supabase non configuré")
     
     def save_candidate(self, cv_data: dict, file_hash: str, filename: str, 
                       wp_user_id: int = 0, wp_offer_id: int = 0, message: str = "") -> dict:
-        """Sauvegarde un candidat dans votre table Supabase"""
+        """Sauvegarde un candidat avec toutes les données extraites"""
         if not self.client:
-            return {"success": False, "error": "Supabase not available"}
+            return {"success": False, "error": "Supabase non disponible"}
         
         try:
             extracted = cv_data.get("extracted", {})
             analysis = cv_data.get("analysis", {})
+            metadata = cv_data.get("metadata", {})
             
-            # Préparer les données EXACTEMENT comme votre table les attend
+            print(f"📤 Préparation données Supabase pour: {filename}")
+            print(f"   Nom: {extracted.get('name')}")
+            print(f"   Email: {extracted.get('email')}")
+            print(f"   Téléphone: {extracted.get('phone')}")
+            print(f"   Compétences: {len(extracted.get('skills', []))}")
+            print(f"   Langues: {len(extracted.get('languages', []))}")
+            print(f"   Expérience: {extracted.get('experience_years', 0)} ans")
+            
+            # Préparer les données EXACTEMENT pour votre table
             candidate_data = {
                 # Informations personnelles
-                "nom": extracted.get("last_name", "") or extracted.get("name", ""),
+                "nom": extracted.get("last_name", ""),
                 "prenom": extracted.get("first_name", ""),
                 "email": extracted.get("email", ""),
                 "telephone": extracted.get("phone", ""),
                 "adresse": extracted.get("location", ""),
                 "linkedin": extracted.get("linkedin", ""),
                 
-                # Compétences et expérience (format JSON)
+                # Compétences (JSON)
                 "competences": json.dumps(extracted.get("skills", []), ensure_ascii=False),
-                "experiences": json.dumps([{
-                    "years": extracted.get("experience_years", 0),
-                    "level": extracted.get("experience_details", "")
-                }], ensure_ascii=False),
                 
-                # Formation
-                "formations": json.dumps([{
-                    "details": extracted.get("education", "")
-                }], ensure_ascii=False),
+                # Expériences (JSON structuré)
+                "experiences": json.dumps({
+                    "total_years": extracted.get("experience_years", 0),
+                    "level": extracted.get("experience_level", ""),
+                    "positions": extracted.get("experience_details", [])
+                }, ensure_ascii=False),
                 
-                # Langues (à extraire si disponible)
-                "langues": json.dumps([], ensure_ascii=False),
+                # Formations (JSON structuré)
+                "formations": json.dumps({
+                    "degree": extracted.get("education_degree", ""),
+                    "institution": extracted.get("education_institution", ""),
+                    "details": extracted.get("education_details", [])
+                }, ensure_ascii=False),
+                
+                # Langues (JSON)
+                "langues": json.dumps(extracted.get("languages", []), ensure_ascii=False),
                 
                 # Texte brut
-                "raw_text": cv_data.get("metadata", {}).get("original_text_preview", "")[:8000],
+                "raw_text": metadata.get("original_text_preview", "")[:8000],
                 
                 # Métiers (basé sur les compétences)
-                "metiers": ", ".join(extracted.get("skills", []))[:200],
+                "metiers": extracted.get("metiers", "Développeur"),
                 
-                # Entreprise et postes
+                # Entreprise (à déterminer)
                 "entreprise": "",
-                "postes": extracted.get("experience_details", ""),
+                
+                # Postes (expérience récente)
+                "postes": extracted.get("experience_level", "Développeur"),
                 
                 # Profil
                 "profil": extracted.get("summary", ""),
@@ -419,9 +792,9 @@ class SupabaseManager:
                 "cv_url": "",
                 
                 # Niveau
-                "niveau": "mid-level",  # À déterminer plus finement
+                "niveau": extracted.get("experience_level", "mid-level"),
                 
-                # Expérience
+                # Années d'expérience
                 "annees_experience": float(extracted.get("experience_years", 0)),
                 
                 # Statuts
@@ -436,51 +809,70 @@ class SupabaseManager:
                 "extraction_date": datetime.now().isoformat(),
                 
                 # Source
-                "source": "python_api",
+                "source": "wordpress_plugin",
                 
                 # Score de confiance
                 "confidence_score": float(analysis.get("confidence_score", 0.0)),
                 
                 # WordPress info
-                "wp_user_id": wp_user_id,
-                "user_id": wp_user_id,
+                "wp_user_id": wp_user_id if wp_user_id else None,
+                "user_id": wp_user_id if wp_user_id else None,
                 "user_name": "",
-                "wp_offer_id": wp_offer_id,
-                "offre_id": wp_offer_id,
+                "wp_offer_id": wp_offer_id if wp_offer_id else None,
+                "offre_id": wp_offer_id if wp_offer_id else None,
                 "offre_postulee": wp_offer_id if wp_offer_id else None,
                 
                 # Message de candidature
                 "message_candidature": message
             }
             
-            # Nettoyer les valeurs None (Supabase les rejette)
+            # Nettoyer les valeurs None pour Supabase
             for key, value in list(candidate_data.items()):
                 if value is None:
                     candidate_data[key] = ""
+                elif isinstance(value, (int, float)) and value == 0:
+                    candidate_data[key] = 0
+                elif isinstance(value, str) and value == "":
+                    candidate_data[key] = ""
             
-            print(f"📤 Inserting into Supabase: {filename}")
-            print(f"   Email: {candidate_data.get('email')}")
-            print(f"   Name: {candidate_data.get('nom')} {candidate_data.get('prenom')}")
-            print(f"   Skills: {len(extracted.get('skills', []))}")
+            print(f"📊 Données à insérer dans Supabase:")
+            print(f"   JSON competences: {candidate_data.get('competences', '')[:100]}...")
+            print(f"   JSON experiences: {candidate_data.get('experiences', '')[:100]}...")
+            print(f"   JSON formations: {candidate_data.get('formations', '')[:100]}...")
+            print(f"   JSON langues: {candidate_data.get('langues', '')[:100]}...")
             
             # Insérer dans Supabase
             response = self.client.table("candidats").insert(candidate_data).execute()
             
             if response.data:
                 candidate_id = response.data[0].get("id")
-                print(f"✅ Inserted successfully, ID: {candidate_id}")
+                print(f"✅ Candidat inséré avec succès, ID: {candidate_id}")
+                
+                # Vérifier l'insertion
+                check = self.client.table("candidats").select("*").eq("id", candidate_id).execute()
+                if check.data:
+                    inserted_data = check.data[0]
+                    print(f"📋 Données vérifiées dans Supabase:")
+                    print(f"   Nom: {inserted_data.get('nom')} {inserted_data.get('prenom')}")
+                    print(f"   Email: {inserted_data.get('email')}")
+                    print(f"   Téléphone: {inserted_data.get('telephone')}")
+                    print(f"   Compétences: {inserted_data.get('competences', '')[:50]}...")
+                    print(f"   Langues: {inserted_data.get('langues', '')[:50]}...")
+                
                 return {
                     "success": True,
                     "candidate_id": candidate_id,
                     "action": "created"
                 }
             else:
-                error_msg = "No data returned from Supabase"
+                error_msg = "Aucune donnée retournée par Supabase"
                 print(f"❌ {error_msg}")
                 return {"success": False, "error": error_msg}
                 
         except Exception as e:
-            print(f"❌ Supabase save error: {e}")
+            print(f"❌ Erreur sauvegarde Supabase: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {"success": False, "error": str(e)}
 
 # Instance globale
@@ -490,10 +882,10 @@ supabase_manager = SupabaseManager()
 @app.get("/")
 async def root():
     return {
-        "service": "TruthTalent CV Parser",
-        "version": "2.0.0",
+        "service": "TruthTalent CV Parser Advanced",
+        "version": "3.0.0",
         "status": "online",
-        "supabase": "connected" if supabase_manager.client else "disconnected"
+        "features": ["extraction_avancée", "supabase_integration", "wordpress_compatible"]
     }
 
 @app.get("/health")
@@ -501,40 +893,41 @@ async def health():
     return {
         "healthy": True,
         "timestamp": datetime.now().isoformat(),
-        "components": {
-            "api": "operational",
-            "extractor": "ready",
-            "supabase": "connected" if supabase_manager.client else "disconnected"
-        }
+        "extractor": "ready",
+        "supabase": "connected" if supabase_manager.client else "disconnected"
     }
 
 @app.post("/extract")
 async def extract_cv(file: UploadFile = File(...)):
-    """Analyse un CV"""
+    """Analyse avancée d'un CV"""
     try:
+        print(f"📥 Requête d'extraction reçue: {file.filename}")
+        
         if not file.filename:
-            raise HTTPException(400, "Filename required")
+            raise HTTPException(400, "Nom de fichier requis")
         
         file_content = await file.read()
+        print(f"   Taille fichier: {len(file_content)} bytes")
         
         if len(file_content) == 0:
-            raise HTTPException(400, "Empty file")
-        
-        if len(file_content) > 10 * 1024 * 1024:
-            raise HTTPException(400, "File too large (max 10MB)")
+            raise HTTPException(400, "Fichier vide")
         
         # Extraire le texte
         text = cv_extractor.extract_text(file_content, file.filename)
+        print(f"   Texte extrait: {len(text)} caractères")
         
-        if not text or len(text.strip()) < 20:
+        if not text or len(text.strip()) < 50:
+            print("⚠️ Texte insuffisant pour analyse")
             return JSONResponse({
                 "success": True,
-                "warning": "Insufficient text for analysis",
+                "warning": "Texte insuffisant pour analyse approfondie",
                 "extracted": {"filename": file.filename}
             })
         
         # Analyser le CV
+        print("🔍 Début de l'analyse du CV...")
         result = cv_extractor.analyze_cv(text, file.filename)
+        print("✅ Analyse terminée")
         
         # Calculer le hash
         file_hash = hashlib.md5(file_content).hexdigest()
@@ -542,6 +935,7 @@ async def extract_cv(file: UploadFile = File(...)):
         # Sauvegarder dans Supabase
         save_result = {}
         if supabase_manager.client:
+            print("💾 Sauvegarde dans Supabase...")
             save_result = supabase_manager.save_candidate(
                 cv_data=result,
                 file_hash=file_hash,
@@ -550,17 +944,21 @@ async def extract_cv(file: UploadFile = File(...)):
             
             if save_result["success"]:
                 result["supabase"] = save_result
+                print("✅ Sauvegarde Supabase réussie")
             else:
                 result["supabase"] = {"success": False, "error": save_result.get("error")}
+                print(f"⚠️ Erreur sauvegarde Supabase: {save_result.get('error')}")
         
         return result
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Extraction error: {e}")
+        print(f"❌ Erreur extraction: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
-            {"success": False, "error": str(e)},
+            {"success": False, "error": f"Erreur interne: {str(e)}"},
             status_code=500
         )
 
@@ -571,28 +969,30 @@ async def process_wordpress_upload(
     wp_offer_id: int = Form(0),
     message: str = Form("")
 ):
-    """Endpoint spécial pour WordPress - CORRIGÉ"""
+    """Endpoint pour WordPress - Version améliorée"""
     try:
-        print(f"📥 WordPress upload received:")
-        print(f"   Filename: {file.filename}")
+        print(f"\n" + "="*50)
+        print(f"📥 UPLOAD WORDPRESS REÇU")
+        print(f"   Fichier: {file.filename}")
         print(f"   User ID: {wp_user_id}")
         print(f"   Offer ID: {wp_offer_id}")
+        print(f"   Message: {message[:50]}..." if message else "   Message: (aucun)")
         
         if not file.filename:
-            raise HTTPException(400, "Filename required")
+            raise HTTPException(400, "Nom de fichier requis")
         
         file_content = await file.read()
-        print(f"   File size: {len(file_content)} bytes")
+        print(f"   Taille: {len(file_content)} bytes")
         
         # Extraire le texte
         text = cv_extractor.extract_text(file_content, file.filename)
-        print(f"   Extracted text length: {len(text)} chars")
+        print(f"   Texte extrait: {len(text)} caractères")
         
-        if not text or len(text.strip()) < 20:
-            print("⚠️ Insufficient text")
+        if not text or len(text.strip()) < 50:
+            print("⚠️ Texte insuffisant")
             return {
                 "success": True,
-                "warning": "Insufficient text",
+                "warning": "Texte insuffisant pour analyse",
                 "extracted": {
                     "name": "Candidat",
                     "email": "",
@@ -602,20 +1002,29 @@ async def process_wordpress_upload(
             }
         
         # Analyser le CV
+        print("🔍 Analyse du CV en cours...")
         result = cv_extractor.analyze_cv(text, file.filename)
         extracted = result.get("extracted", {})
-        print(f"   Analysis results:")
-        print(f"     Name: {extracted.get('name')}")
-        print(f"     Email: {extracted.get('email')}")
-        print(f"     Phone: {extracted.get('phone')}")
-        print(f"     Skills: {len(extracted.get('skills', []))}")
+        
+        print(f"📊 RÉSULTATS EXTRACTION:")
+        print(f"   Nom: {extracted.get('name')}")
+        print(f"   Email: {extracted.get('email')}")
+        print(f"   Téléphone: {extracted.get('phone')}")
+        print(f"   Localisation: {extracted.get('location')}")
+        print(f"   Compétences: {len(extracted.get('skills', []))}")
+        print(f"   Langues: {len(extracted.get('languages', []))}")
+        print(f"   Expérience: {extracted.get('experience_years', 0)} ans")
+        print(f"   Niveau: {extracted.get('experience_level')}")
+        print(f"   Formation: {extracted.get('education_degree')}")
+        print(f"   Métiers: {extracted.get('metiers')}")
         
         # Calculer le hash
         file_hash = hashlib.md5(file_content).hexdigest()
         
-        # Sauvegarder dans Supabase avec infos WordPress
+        # Sauvegarder dans Supabase
         save_result = {}
         if supabase_manager.client:
+            print("💾 Sauvegarde dans Supabase...")
             save_result = supabase_manager.save_candidate(
                 cv_data=result,
                 file_hash=file_hash,
@@ -624,8 +1033,11 @@ async def process_wordpress_upload(
                 wp_offer_id=wp_offer_id,
                 message=message
             )
-            print(f"   Supabase save result: {save_result.get('success')}")
+            print(f"   Résultat sauvegarde: {save_result.get('success', False)}")
+            if save_result.get("error"):
+                print(f"   Erreur: {save_result.get('error')}")
         
+        # Préparer la réponse
         response = {
             "success": True,
             "message": "CV analysé avec succès",
@@ -642,11 +1054,13 @@ async def process_wordpress_upload(
         if message:
             response["candidate_message"] = message
         
-        print("✅ Request processed successfully")
+        print("✅ Traitement terminé avec succès")
+        print("="*50 + "\n")
+        
         return response
         
     except Exception as e:
-        print(f"❌ WordPress upload error: {e}")
+        print(f"❌ ERREUR WordPress: {str(e)}")
         import traceback
         traceback.print_exc()
         return JSONResponse(
@@ -656,19 +1070,30 @@ async def process_wordpress_upload(
 
 @app.get("/test-supabase")
 async def test_supabase():
-    """Test Supabase"""
+    """Test Supabase avec vérification"""
     if not supabase_manager.client:
-        return {"connected": False, "error": "Client not initialized"}
+        return {"connected": False, "error": "Client non initialisé"}
     
     try:
-        # Test simple de connexion
-        response = supabase_manager.client.table("candidats").select("count", count="exact").limit(1).execute()
+        # Tester la connexion et lire quelques données
+        response = supabase_manager.client.table("candidats").select("*").order("created_at", desc=True).limit(3).execute()
+        
+        candidates_info = []
+        if response.data:
+            for candidate in response.data:
+                candidates_info.append({
+                    "id": candidate.get("id"),
+                    "nom": candidate.get("nom"),
+                    "email": candidate.get("email"),
+                    "competences": candidate.get("competences", "")[:50] + "..." if candidate.get("competences") else "vide"
+                })
         
         return {
             "connected": True,
             "supabase_url": SUPABASE_URL,
-            "table_test": "success" if response.count is not None else "failed",
-            "count": response.count
+            "test": "success",
+            "recent_candidates": candidates_info,
+            "total_count": len(response.data) if response.data else 0
         }
     except Exception as e:
         return {"connected": False, "error": str(e)}
@@ -676,10 +1101,14 @@ async def test_supabase():
 # ========== POINT D'ENTRÉE ==========
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    print(f"🚀 TruthTalent API started on port {port}")
-    print(f"📦 PDF support: {PDF_AVAILABLE}")
-    print(f"📄 DOCX support: {DOCX_AVAILABLE}")
-    print(f"📊 Supabase: {SUPABASE_AVAILABLE and bool(SUPABASE_KEY)}")
+    print(f"\n" + "="*50)
+    print(f"🚀 TruthTalent API Advanced démarrée")
+    print(f"   Port: {port}")
+    print(f"   PDF support: {PDF_AVAILABLE}")
+    print(f"   DOCX support: {DOCX_AVAILABLE}")
+    print(f"   Supabase: {SUPABASE_AVAILABLE and bool(SUPABASE_KEY)}")
+    print(f"   Extraction: PRÊTE")
+    print("="*50 + "\n")
     
     uvicorn.run(
         app,
