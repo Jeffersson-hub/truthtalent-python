@@ -105,6 +105,103 @@ async def test_upload(file: UploadFile = File(...)):
         "content_type": file.content_type
     }
 
+@app.post("/process-wordpress-upload")
+async def process_wordpress_upload(
+    file: UploadFile = File(...),
+    wp_user_id: Optional[int] = None,
+    wp_offer_id: Optional[int] = None,
+    message: Optional[str] = None
+):
+    """
+    Endpoint spécial pour les uploads depuis WordPress
+    
+    Args:
+        file: Fichier CV
+        wp_user_id: ID utilisateur WordPress
+        wp_offer_id: ID offre WordPress
+        message: Message de candidature
+    
+    Returns:
+        Dict: Résultat de l'analyse avec format adapté
+    """
+    try:
+        # Validation
+        if not file.filename:
+            raise HTTPException(400, "Nom de fichier manquant")
+        
+        # Lire le fichier
+        file_content = await file.read()
+        
+        if len(file_content) == 0:
+            raise HTTPException(400, "Fichier vide")
+        
+        # Extraire le texte
+        text = cv_extractor.extract_text(file_content, file.filename)
+        
+        if not text or len(text.strip()) < 20:
+            return {
+                "success": True,
+                "warning": "Texte insuffisant pour analyse approfondie",
+                "extracted": {
+                    "filename": file.filename,
+                    "email": "",
+                    "phone": "",
+                    "name": "Candidat",
+                    "skills": [],
+                    "languages": [],
+                    "level": "entry"
+                }
+            }
+        
+        # Analyser le CV
+        result = cv_extractor.analyze_cv(text, file.filename)
+        
+        # Calculer le hash
+        file_hash = hashlib.md5(file_content).hexdigest()
+        
+        # Sauvegarder dans Supabase
+        save_result = {}
+        if supabase_manager.client:
+            save_result = supabase_manager.save_candidate(
+                cv_data=result,
+                file_hash=file_hash,
+                filename=file.filename,
+                wp_user_id=wp_user_id,
+                offer_id=wp_offer_id
+            )
+        
+        # Formater la réponse pour WordPress
+        response = {
+            "success": True,
+            "message": "CV analysé avec succès",
+            "analysis": result["analysis"],
+            "extracted": result["extracted"],
+            "supabase": save_result,
+            "file_info": {
+                "original_name": file.filename,
+                "file_hash": file_hash,
+                "size": len(file_content),
+                "text_length": len(text)
+            }
+        }
+        
+        # Ajouter message si fourni
+        if message:
+            response["candidate_message"] = message
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Erreur /process-wordpress-upload: {e}")
+        return JSONResponse(
+            {
+                "success": False, 
+                "error": str(e),
+                "recommendation": "Veuillez réessayer avec un autre fichier"
+            },
+            status_code=500
+        )
+
 # ========== POINT D'ENTRÉE POUR RENDER ==========
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
